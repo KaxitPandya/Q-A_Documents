@@ -6,4 +6,5 @@ langchain_openai
 chromadb
 openai
 pypdf2
+pypdf
 python-docx
