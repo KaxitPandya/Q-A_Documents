@@ -7,6 +7,7 @@ from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 import os
+from chromadb.config import Settings
 
 # Streamlit App
 st.title("Q&A on Documents and Wikipedia with Chroma")
@@ -48,12 +49,21 @@ def chunk_data(data, chunk_size=256):
 
 def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
     embeddings = OpenAIEmbeddings()
-    vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory)
+    chroma_settings = Settings(
+        persist_directory=persist_directory,
+        chroma_db_impl="duckdb+parquet"  # Use DuckDB backend
+    )
+    vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory, settings=chroma_settings)
     return vector_store
 
 def load_embeddings_chroma(persist_directory='./chroma_db'):
     embeddings = OpenAIEmbeddings()
-    return Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+    chroma_settings = Settings(
+        persist_directory=persist_directory,
+        chroma_db_impl="duckdb+parquet"  # Use DuckDB backend
+    )
+    return Chroma(persist_directory=persist_directory, embedding_function=embeddings, settings=chroma_settings)
+
 
 def ask_and_get_answer(vector_store, q, k=3):
     llm = ChatOpenAI(model='gpt-3.5-turbo', temperature=1)
