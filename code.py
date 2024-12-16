@@ -8,6 +8,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 import os
 from chromadb.config import Settings
+from chromadb.config import Settings
+from langchain.vectorstores import Chroma
 
 # Streamlit App
 st.title("Q&A on Documents and Wikipedia with Chroma")
@@ -42,27 +44,37 @@ def load_document(file):
     data = loader.load()
     return data
 
-
 def chunk_data(data, chunk_size=256):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
     return text_splitter.split_documents(data)
 
 def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
-    embeddings = OpenAIEmbeddings()
+    # Configure Chroma to use DuckDB+Parquet
     chroma_settings = Settings(
         persist_directory=persist_directory,
-        chroma_db_impl="duckdb+parquet"  # Use DuckDB backend
+        chroma_db_impl="duckdb+parquet"  # Use DuckDB as the backend
     )
-    vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory, settings=chroma_settings)
+    embeddings = OpenAIEmbeddings()
+    vector_store = Chroma.from_documents(
+        chunks,
+        embeddings,
+        persist_directory=persist_directory,
+        client_settings=chroma_settings
+    )
     return vector_store
 
 def load_embeddings_chroma(persist_directory='./chroma_db'):
-    embeddings = OpenAIEmbeddings()
     chroma_settings = Settings(
         persist_directory=persist_directory,
-        chroma_db_impl="duckdb+parquet"  # Use DuckDB backend
+        chroma_db_impl="duckdb+parquet"  # Use DuckDB as the backend
     )
-    return Chroma(persist_directory=persist_directory, embedding_function=embeddings, settings=chroma_settings)
+    embeddings = OpenAIEmbeddings()
+    return Chroma(
+        persist_directory=persist_directory,
+        embedding_function=embeddings,
+        client_settings=chroma_settings
+    )
+
 
 
 def ask_and_get_answer(vector_store, q, k=3):
