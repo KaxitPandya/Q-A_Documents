@@ -1,6 +1,7 @@
 streamlit
 python-dotenv
 langchain
+langchain-community
 langchain_openai
 chromadb
 openai
