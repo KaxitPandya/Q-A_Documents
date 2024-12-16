@@ -19,17 +19,28 @@ os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 
 # Helper Functions
 def load_document(file):
+    import tempfile
+
+    # Save the uploaded file to a temporary location
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
+        tmp_file.write(file.read())
+        tmp_file_path = tmp_file.name
+
+    # Determine the loader based on file extension
     name, extension = os.path.splitext(file.name)
     if extension == '.pdf':
-        loader = PyPDFLoader(file)
+        loader = PyPDFLoader(tmp_file_path)
     elif extension == '.docx':
-        loader = Docx2txtLoader(file)
+        loader = Docx2txtLoader(tmp_file_path)
     elif extension == '.txt':
-        loader = TextLoader(file)
+        loader = TextLoader(tmp_file_path)
     else:
         st.error("Unsupported file format!")
         return None
-    return loader.load()
+
+    data = loader.load()
+    return data
+
 
 def chunk_data(data, chunk_size=256):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
