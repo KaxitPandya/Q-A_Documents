@@ -3,3 +3,6 @@ python-dotenv
 langchain
 langchain_openai
 chromadb
+openai
+pypdf2
+python-docx
