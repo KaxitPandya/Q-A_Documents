@@ -12,11 +12,10 @@ import os
 st.title("Q&A on Documents and Wikipedia with Chroma")
 
 # API Key Setup
-openai_api_key = st.text_input("Enter your OpenAI API Key", type="password")
-if not openai_api_key:
-    st.warning("Please provide your OpenAI API key to proceed.")
+if "openai_api_key" not in st.secrets:
+    st.error("Please add your OpenAI API key to Streamlit secrets to proceed.")
     st.stop()
-os.environ["OPENAI_API_KEY"] = openai_api_key
+os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 
 # Helper Functions
 def load_document(file):
