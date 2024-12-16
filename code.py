@@ -8,8 +8,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 import os
 from chromadb.config import Settings
-from chromadb.config import Settings
 from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
 # Streamlit App
 st.title("Q&A on Documents and Wikipedia with Chroma")
@@ -51,8 +51,8 @@ def chunk_data(data, chunk_size=256):
 def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
     # Configure Chroma to use DuckDB+Parquet
     chroma_settings = Settings(
-        persist_directory=persist_directory,
-        chroma_db_impl="duckdb+parquet"  # Use DuckDB as the backend
+        chroma_db_impl="duckdb+parquet",
+        persist_directory=persist_directory
     )
     embeddings = OpenAIEmbeddings()
     vector_store = Chroma.from_documents(
@@ -65,8 +65,8 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
 
 def load_embeddings_chroma(persist_directory='./chroma_db'):
     chroma_settings = Settings(
-        persist_directory=persist_directory,
-        chroma_db_impl="duckdb+parquet"  # Use DuckDB as the backend
+        chroma_db_impl="duckdb+parquet",
+        persist_directory=persist_directory
     )
     embeddings = OpenAIEmbeddings()
     return Chroma(
@@ -74,6 +74,7 @@ def load_embeddings_chroma(persist_directory='./chroma_db'):
         embedding_function=embeddings,
         client_settings=chroma_settings
     )
+
 
 
 
