@@ -48,9 +48,16 @@ def chunk_data(data, chunk_size=256):
     return text_splitter.split_documents(data)
 
 @st.cache_resource
-def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
+def create_embeddings_chroma(_chunks, persist_directory='./chroma_db'):
+    from langchain.vectorstores import Chroma
+    from langchain_openai import OpenAIEmbeddings
+
     embeddings = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
-    return Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory)
+
+    vector_store = Chroma.from_documents(_chunks, embeddings, persist_directory=persist_directory)
+
+    return vector_store
+
 
 def ask_and_get_answer(vector_store, q, k=3):
     llm = ChatOpenAI(model='gpt-3.5-turbo', temperature=1)
