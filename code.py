@@ -1,17 +1,19 @@
 import streamlit as st
 import os
+import tempfile
 from langchain.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader, WikipediaLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import RetrievalQA, ConversationalRetrievalChain
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-import tempfile
+from chromadb.config import Settings
 
-# Streamlit App
-st.title("Q&A on Documents and Wikipedia with Chroma")
+# Streamlit App Title
+st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
 
-# API Key Setup
+# Set OpenAI API Key
 if "openai_api_key" not in st.secrets:
     st.error("Please add your OpenAI API key to Streamlit secrets to proceed.")
     st.stop()
@@ -19,51 +21,39 @@ os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 
 # Helper Functions
 def load_document(file):
-    name, extension = os.path.splitext(file.name)
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as tmp_file:
-        tmp_file.write(file.getvalue())
+    """Load document based on its file type."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
+        tmp_file.write(file.read())
         tmp_file_path = tmp_file.name
 
-    if extension == '.pdf':
+    name, extension = os.path.splitext(file.name)
+    if extension == ".pdf":
         loader = PyPDFLoader(tmp_file_path)
-    elif extension == '.docx':
+    elif extension == ".docx":
         loader = Docx2txtLoader(tmp_file_path)
-    elif extension == '.txt':
+    elif extension == ".txt":
         loader = TextLoader(tmp_file_path)
     else:
         st.error("Unsupported file format!")
         return None
 
-    data = loader.load()
-    os.unlink(tmp_file_path)
-    return data
-
-def load_from_wikipedia(query, lang='en', load_max_docs=2):
-    loader = WikipediaLoader(query=query, lang=lang, load_max_docs=load_max_docs)
     return loader.load()
 
 def chunk_data(data, chunk_size=256):
+    """Split data into chunks."""
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
     return text_splitter.split_documents(data)
 
-@st.cache_resource
-def create_embeddings_chroma(_chunks, persist_directory='./chroma_db'):
-    from langchain.vectorstores import Chroma
-    from langchain_openai import OpenAIEmbeddings
-
-    embeddings = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
-
-    vector_store = Chroma.from_documents(_chunks, embeddings, persist_directory=persist_directory)
-
+def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
+    """Create and persist embeddings in ChromaDB."""
+    embeddings = OpenAIEmbeddings()
+    vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory)
     return vector_store
 
-
-def ask_and_get_answer(vector_store, q, k=3):
-    llm = ChatOpenAI(model='gpt-3.5-turbo', temperature=1)
-    retriever = vector_store.as_retriever(search_type='similarity', search_kwargs={'k': k})
-    chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
-    return chain.invoke(q)
+def load_embeddings_chroma(persist_directory='./chroma_db'):
+    """Load embeddings from ChromaDB."""
+    embeddings = OpenAIEmbeddings()
+    return Chroma(persist_directory=persist_directory, embedding_function=embeddings)
 
 # File Upload Section
 st.subheader("Upload Your Document")
@@ -80,52 +70,44 @@ if uploaded_file:
             if st.button("Create Embeddings"):
                 with st.spinner("Creating embeddings..."):
                     vector_store = create_embeddings_chroma(chunks)
-                    st.session_state.vector_store = vector_store
-                    st.success("Embeddings created and stored in Chroma DB!")
+                    st.success("Embeddings created and stored in ChromaDB!")
 
 # Wikipedia Search Section
 st.subheader("Search Wikipedia")
 wikipedia_query = st.text_input("Enter a Wikipedia topic to search:")
 if wikipedia_query:
     with st.spinner("Fetching data from Wikipedia..."):
-        wiki_data = load_from_wikipedia(wikipedia_query)
+        loader = WikipediaLoader(query=wikipedia_query, load_max_docs=2)
+        wiki_data = loader.load()
         wiki_chunks = chunk_data(wiki_data)
         st.write(f"Fetched and split into {len(wiki_chunks)} chunks.")
         if st.button("Create Wikipedia Embeddings"):
-            with st.spinner("Creating Wikipedia embeddings..."):
-                wiki_vector_store = create_embeddings_chroma(wiki_chunks, persist_directory='./wiki_chroma_db')
-                st.session_state.wiki_vector_store = wiki_vector_store
-                st.success("Wikipedia embeddings created and stored!")
+            with st.spinner("Creating embeddings for Wikipedia data..."):
+                vector_store = create_embeddings_chroma(wiki_chunks)
+                st.success("Embeddings for Wikipedia data created and stored!")
 
 # Conversational Q&A Section
 st.subheader("Ask Questions")
-if 'vector_store' in st.session_state or 'wiki_vector_store' in st.session_state:
-    vector_store = st.session_state.get('vector_store') or st.session_state.get('wiki_vector_store')
-    
-    if 'memory' not in st.session_state:
-        st.session_state.memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
-    
-    crc = ConversationalRetrievalChain.from_llm(
-        llm=ChatOpenAI(model='gpt-3.5-turbo', temperature=0),
-        retriever=vector_store.as_retriever(search_type='similarity', search_kwargs={'k': 5}),
-        memory=st.session_state.memory,
-        chain_type='stuff'
+if "vector_store" in locals() or "vector_store" in globals():
+    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    qa_chain = ConversationalRetrievalChain.from_llm(
+        llm=ChatOpenAI(model="gpt-3.5-turbo", temperature=0),
+        retriever=retriever,
+        memory=memory,
+        chain_type="stuff"
     )
-    
+
     question = st.text_input("Enter your question:")
     if question:
         with st.spinner("Generating answer..."):
-            result = crc.invoke({'question': question})
-            st.write("**Answer:**", result['answer'])
-            
+            result = qa_chain({"question": question})
+            st.write("**Answer:**", result["answer"])
             st.write("**Conversation History:**")
-            for i, message in enumerate(st.session_state.memory.chat_memory.messages):
-                if i % 2 == 0:
-                    st.write("Human: ", message.content)
-                else:
-                    st.write("AI: ", message.content)
+            for message in result["chat_history"]:
+                st.write(message)
 else:
-    st.info("Please upload a document or search Wikipedia and create embeddings first.")
+    st.info("Please upload a document or fetch Wikipedia data to create embeddings first.")
 
 st.write("---")
 st.info("This app supports PDF, DOCX, TXT files, and Wikipedia queries for Q&A.")
