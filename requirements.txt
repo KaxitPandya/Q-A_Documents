@@ -9,3 +9,7 @@ pypdf2
 pypdf
 python-docx
 pysqlite3-binary
+pinecone-client
+tiktoken
+wikipedia
+docx2txt
