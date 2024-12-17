@@ -1,4 +1,10 @@
 import streamlit as st
+import pysqlite3
+import sys
+
+# Replace sqlite3 with pysqlite3
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 from langchain.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader, WikipediaLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
@@ -8,8 +14,6 @@ from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 import os
 from chromadb.config import Settings
-from langchain.vectorstores import Chroma
-from langchain_community.vectorstores import Chroma
 
 # Streamlit App
 st.title("Q&A on Documents and Wikipedia with Chroma")
@@ -49,7 +53,6 @@ def chunk_data(data, chunk_size=256):
     return text_splitter.split_documents(data)
 
 def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
-    # Configure Chroma to use DuckDB+Parquet
     chroma_settings = Settings(
         chroma_db_impl="duckdb+parquet",
         persist_directory=persist_directory
@@ -74,9 +77,6 @@ def load_embeddings_chroma(persist_directory='./chroma_db'):
         embedding_function=embeddings,
         client_settings=chroma_settings
     )
-
-
-
 
 def ask_and_get_answer(vector_store, q, k=3):
     llm = ChatOpenAI(model='gpt-3.5-turbo', temperature=1)
