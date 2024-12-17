@@ -57,8 +57,8 @@ def chunk_data(data, chunk_size=256):
     return text_splitter.split_documents(data)
 
 def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
-    client = chromadb.Client()
-    collection = client.create_collection("my_collection")
+    client = chromadb.PersistentClient(path=persist_directory)
+    collection = client.get_or_create_collection("my_collection")
     
     documents = [chunk.page_content for chunk in chunks]
     metadatas = [chunk.metadata for chunk in chunks]
@@ -73,17 +73,11 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
     return collection
 
 
+
 def load_embeddings_chroma(persist_directory='./chroma_db'):
-    chroma_settings = Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=persist_directory
-    )
-    embeddings = OpenAIEmbeddings()
-    return Chroma(
-        persist_directory=persist_directory,
-        embedding_function=embeddings,
-        client_settings=chroma_settings
-    )
+    client = chromadb.PersistentClient(path=persist_directory)
+    return client.get_collection("my_collection")
+
 
 def ask_and_get_answer(collection, q, k=3):
     results = collection.query(
@@ -94,6 +88,7 @@ def ask_and_get_answer(collection, q, k=3):
     # Process the results as needed
     # You may need to adjust this part based on your specific requirements
     return results
+
 
 
 # File Upload Section
