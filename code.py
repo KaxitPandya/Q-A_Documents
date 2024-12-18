@@ -133,4 +133,4 @@ if "collection" in locals():
 else:
     st.info("Please upload a document or fetch Wikipedia data to create embeddings first.")
 
-st.write("---")
+# st.write("---")
