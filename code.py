@@ -86,7 +86,9 @@ if uploaded_file:
             if st.button("Create Embeddings"):
                 with st.spinner("Creating embeddings..."):
                     collection = create_embeddings_chroma(chunks)
+                    st.session_state.collection = collection
                     st.success("Embeddings created and stored in ChromaDB!")
+
 
 # Wikipedia Search Section
 st.subheader("Search Wikipedia")
@@ -100,11 +102,12 @@ if wikipedia_query:
         if st.button("Create Wikipedia Embeddings"):
             with st.spinner("Creating embeddings for Wikipedia data..."):
                 collection = create_embeddings_chroma(wiki_chunks)
+                st.session_state.collection = collection
                 st.success("Embeddings for Wikipedia data created and stored!")
 
 # Conversational Q&A Section
 st.subheader("Ask Questions")
-if "collection" in locals():
+if "collection" in st.session_state:
     client = chromadb.PersistentClient(path="./chroma_db")
     collection = client.get_or_create_collection("my_collection")
     embeddings = OpenAIEmbeddings()
@@ -114,11 +117,14 @@ if "collection" in locals():
         embedding_function=embeddings
     )
     retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    
+    if "memory" not in st.session_state:
+        st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    
     qa_chain = ConversationalRetrievalChain.from_llm(
         llm=ChatOpenAI(model="gpt-3.5-turbo", temperature=0),
         retriever=retriever,
-        memory=memory,
+        memory=st.session_state.memory,
         chain_type="stuff"
     )
 
@@ -132,5 +138,6 @@ if "collection" in locals():
                 st.write(message)
 else:
     st.info("Please upload a document or fetch Wikipedia data to create embeddings first.")
+
 
 # st.write("---")
