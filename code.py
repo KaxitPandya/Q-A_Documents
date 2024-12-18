@@ -48,11 +48,16 @@ def chunk_data(data, chunk_size=256):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
     return text_splitter.split_documents(data)
 
+from langchain.embeddings import OpenAIEmbeddings
+embeddings = OpenAIEmbeddings()
+
+# Create embeddings with OpenAIEmbeddings
 @st.cache_resource
 def create_embeddings_chroma(_chunks, persist_directory='./chroma_db'):
     """Create and persist embeddings in ChromaDB."""
+    embeddings = OpenAIEmbeddings()  # Ensure this matches retrieval embeddings
     client = chromadb.PersistentClient(path=persist_directory)
-    collection = client.get_or_create_collection("my_collection")
+    collection = client.get_or_create_collection("my_collection", embedding_function=embeddings.embed_documents)
     
     documents = [chunk.page_content for chunk in _chunks]
     metadatas = [chunk.metadata for chunk in _chunks]
@@ -63,13 +68,15 @@ def create_embeddings_chroma(_chunks, persist_directory='./chroma_db'):
         metadatas=metadatas,
         ids=ids
     )
-    
     return collection
 
+# Load embeddings with the same dimensionality
 def load_embeddings_chroma(persist_directory='./chroma_db'):
     """Load embeddings from ChromaDB."""
+    embeddings = OpenAIEmbeddings()  # Ensure this matches creation embeddings
     client = chromadb.PersistentClient(path=persist_directory)
-    return client.get_collection("my_collection")
+    return client.get_collection("my_collection", embedding_function=embeddings.embed_documents)
+
 
 # File Upload Section
 st.subheader("Upload Your Document")
