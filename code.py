@@ -1,3 +1,7 @@
+import sys
+import pysqlite3
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import streamlit as st
 import os
 import tempfile
@@ -9,6 +13,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 import chromadb
+
 
 # Streamlit App Title
 st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
