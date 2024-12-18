@@ -107,7 +107,7 @@ if wikipedia_query:
 st.subheader("Ask Questions")
 if "collection" in locals():
     embeddings = OpenAIEmbeddings()
-    vector_store = Chroma(client=collection.client, collection_name=collection.name, embedding_function=embeddings)
+    vector_store = Chroma(client=collection._client, collection_name=collection.name, embedding_function=embeddings)
     retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     qa_chain = ConversationalRetrievalChain.from_llm(
