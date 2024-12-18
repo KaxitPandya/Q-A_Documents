@@ -70,11 +70,12 @@ if uploaded_file:
             chunks = chunk_data(data)
             st.write(f"Document split into {len(chunks)} chunks.")
 
-            # Embedding Creation
-            if st.button("Create Embeddings"):
-                with st.spinner("Creating embeddings..."):
-                    vector_store = create_embeddings_chroma(chunks)
-                    st.success("Embeddings created and stored in ChromaDB!")
+        if st.button("Create Embeddings"):
+            with st.spinner("Creating embeddings..."):
+                vector_store = create_embeddings_chroma(chunks)
+                st.session_state.vector_store = vector_store
+                st.success("Embeddings created and stored in ChromaDB!")
+
 
 # Wikipedia Search Section
 st.subheader("Search Wikipedia")
@@ -88,17 +89,21 @@ if wikipedia_query:
         if st.button("Create Wikipedia Embeddings"):
             with st.spinner("Creating embeddings for Wikipedia data..."):
                 vector_store = create_embeddings_chroma(wiki_chunks)
+                st.session_state.vector_store = vector_store
                 st.success("Embeddings for Wikipedia data created and stored!")
 
 # Conversational Q&A Section
 st.subheader("Ask Questions")
-if "vector_store" in locals() or "vector_store" in globals():
-    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+if "vector_store" in st.session_state:
+    retriever = st.session_state.vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+    
+    if "memory" not in st.session_state:
+        st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    
     qa_chain = ConversationalRetrievalChain.from_llm(
         llm=ChatOpenAI(model="gpt-3.5-turbo", temperature=0),
         retriever=retriever,
-        memory=memory,
+        memory=st.session_state.memory,
         chain_type="stuff"
     )
 
@@ -112,3 +117,4 @@ if "vector_store" in locals() or "vector_store" in globals():
                 st.write(message)
 else:
     st.info("Please upload a document or fetch Wikipedia data to create embeddings first.")
+
