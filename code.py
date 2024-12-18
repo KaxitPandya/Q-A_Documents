@@ -14,7 +14,6 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 import chromadb
 
-
 # Streamlit App Title
 st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
 
@@ -106,8 +105,14 @@ if wikipedia_query:
 # Conversational Q&A Section
 st.subheader("Ask Questions")
 if "collection" in locals():
+    client = chromadb.PersistentClient(path="./chroma_db")
+    collection = client.get_or_create_collection("my_collection")
     embeddings = OpenAIEmbeddings()
-    vector_store = Chroma(client=collection._client, collection_name=collection.name, embedding_function=embeddings)
+    vector_store = Chroma(
+        client=client,
+        collection_name=collection.name,
+        embedding_function=embeddings
+    )
     retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     qa_chain = ConversationalRetrievalChain.from_llm(
