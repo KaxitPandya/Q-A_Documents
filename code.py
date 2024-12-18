@@ -21,7 +21,7 @@ st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
 if "openai_api_key" not in st.secrets:
     st.error("Please add your OpenAI API key to Streamlit secrets to proceed.")
     st.stop()
-os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 
 # Helper Functions
 def load_document(file):
