@@ -134,4 +134,3 @@ else:
     st.info("Please upload a document or fetch Wikipedia data to create embeddings first.")
 
 st.write("---")
-st.info("This app supports PDF, DOCX, TXT files, and Wikipedia queries for Q&A.")
