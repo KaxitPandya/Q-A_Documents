@@ -8,7 +8,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from chromadb.config import Settings
+import chromadb
 
 # Streamlit App Title
 st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
@@ -44,16 +44,28 @@ def chunk_data(data, chunk_size=256):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
     return text_splitter.split_documents(data)
 
-def create_embeddings_chroma(chunks, persist_directory='./chroma_db'):
+@st.cache_resource
+def create_embeddings_chroma(_chunks, persist_directory='./chroma_db'):
     """Create and persist embeddings in ChromaDB."""
-    embeddings = OpenAIEmbeddings()
-    vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory)
-    return vector_store
+    client = chromadb.PersistentClient(path=persist_directory)
+    collection = client.get_or_create_collection("my_collection")
+    
+    documents = [chunk.page_content for chunk in _chunks]
+    metadatas = [chunk.metadata for chunk in _chunks]
+    ids = [str(i) for i in range(len(_chunks))]
+    
+    collection.add(
+        documents=documents,
+        metadatas=metadatas,
+        ids=ids
+    )
+    
+    return collection
 
 def load_embeddings_chroma(persist_directory='./chroma_db'):
     """Load embeddings from ChromaDB."""
-    embeddings = OpenAIEmbeddings()
-    return Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+    client = chromadb.PersistentClient(path=persist_directory)
+    return client.get_collection("my_collection")
 
 # File Upload Section
 st.subheader("Upload Your Document")
@@ -69,7 +81,7 @@ if uploaded_file:
             # Embedding Creation
             if st.button("Create Embeddings"):
                 with st.spinner("Creating embeddings..."):
-                    vector_store = create_embeddings_chroma(chunks)
+                    collection = create_embeddings_chroma(chunks)
                     st.success("Embeddings created and stored in ChromaDB!")
 
 # Wikipedia Search Section
@@ -83,12 +95,14 @@ if wikipedia_query:
         st.write(f"Fetched and split into {len(wiki_chunks)} chunks.")
         if st.button("Create Wikipedia Embeddings"):
             with st.spinner("Creating embeddings for Wikipedia data..."):
-                vector_store = create_embeddings_chroma(wiki_chunks)
+                collection = create_embeddings_chroma(wiki_chunks)
                 st.success("Embeddings for Wikipedia data created and stored!")
 
 # Conversational Q&A Section
 st.subheader("Ask Questions")
-if "vector_store" in locals() or "vector_store" in globals():
+if "collection" in locals():
+    embeddings = OpenAIEmbeddings()
+    vector_store = Chroma(client=collection.client, collection_name=collection.name, embedding_function=embeddings)
     retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     qa_chain = ConversationalRetrievalChain.from_llm(
