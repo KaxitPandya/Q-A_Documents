@@ -18,9 +18,9 @@ import chromadb
 st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
 
 # Set OpenAI API Key
-if "openai_api_key" not in st.secrets:
-    st.error("Please add your OpenAI API key to Streamlit secrets to proceed.")
-    st.stop()
+# if "openai_api_key" not in st.secrets:
+#     st.error("Please add your OpenAI API key to Streamlit secrets to proceed.")
+#     st.stop()
 os.environ["OPENAI_API_KEY"] = "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"
 
 # Helper Functions
