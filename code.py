@@ -15,7 +15,7 @@ from langchain.memory import ConversationBufferMemory
 import chromadb
 
 # Streamlit App Title
-st.title("Q&A on Documents and Wikipedia with LangChain & ChromaDB")
+st.title("Q&A on Documents and search with Wikipedia")
 
 # Set OpenAI API Key
 if "openai_api_key" not in st.secrets:
