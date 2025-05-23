@@ -2,7 +2,7 @@ streamlit
 python-dotenv
 langchain
 langchain-community
-langchain_openai
+langchain-openai
 chromadb
 openai
 pypdf2
@@ -13,3 +13,4 @@ pinecone-client
 tiktoken
 wikipedia
 docx2txt
+protobuf==3.20.1
