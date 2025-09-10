@@ -114,7 +114,13 @@ st.markdown("Upload documents or search Wikipedia to ask questions and get fast,
 # Sidebar for settings
 with st.sidebar:
     st.header("⚙️ Settings")
-    os.environ["OPENAI_API_KEY"] = api_key
+    api_key = st.secrets.get("openai_api_key", os.environ.get("OPENAI_API_KEY", ""))
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
+        st.success("✅ API Key loaded")
+    else:
+        st.error("❌ OpenAI API key not found!")
+
 
     # # API Key configuration
     # api_key = st.text_input("OpenAI API Key", type="password", value=st.secrets.get("openai_api_key", ""))
