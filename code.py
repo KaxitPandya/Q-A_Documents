@@ -19,8 +19,82 @@ from langchain.memory import ConversationBufferMemory
 from langchain.callbacks import get_openai_callback
 import chromadb
 
-# Streamlit App Title
-st.title("Q&A on Documents with Wikipedia Search")
+# Page configuration for a professional look
+st.set_page_config(
+    page_title="Q&A on Documents",
+    page_icon="📚",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Custom CSS for a more professional UI
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1E88E5;
+        text-align: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #1E88E5;
+    }
+    .sub-header {
+        font-size: 1.8rem;
+        color: #0D47A1;
+        padding-top: 1rem;
+    }
+    .info-box {
+        background-color: #E3F2FD;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #1E88E5;
+        margin: 1rem 0;
+    }
+    .success-box {
+        background-color: #E8F5E9;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #4CAF50;
+        margin: 1rem 0;
+    }
+    .warning-box {
+        background-color: #FFF8E1;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #FF9800;
+        margin: 1rem 0;
+    }
+    .error-box {
+        background-color: #FFEBEE;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #F44336;
+        margin: 1rem 0;
+    }
+    .stButton button {
+        background-color: #1E88E5;
+        color: white;
+        border-radius: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+    }
+    .stButton button:hover {
+        background-color: #0D47A1;
+    }
+    .stProgress .st-bo {
+        background-color: #1E88E5;
+    }
+    div[data-testid="stSidebar"] {
+        background-color: #F5F5F5;
+    }
+    .stTab {
+        font-weight: bold;
+    }
+    .stTextInput input {
+        border-radius: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Initialize session state variables
 if "vector_store" not in st.session_state:
@@ -31,6 +105,12 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "token_count" not in st.session_state:
     st.session_state.token_count = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+if "last_action" not in st.session_state:
+    st.session_state.last_action = None
+if "last_error" not in st.session_state:
+    st.session_state.last_error = None
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = 0  # 0: Document Upload, 1: Wikipedia, 2: Chat
 
 # Sidebar configuration
 with st.sidebar:
@@ -196,6 +276,10 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
         ChromaDB vector store or None if embeddings failed
     """
     try:
+        if not chunks or len(chunks) == 0:
+            st.error("No chunks to embed. Please check your document.")
+            return None
+        
         # Show progress bar during embedding
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -207,28 +291,36 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
         # Create embeddings
         embeddings = OpenAIEmbeddings()
         
-        # Create vector store
-        for i in range(1, 11):  # Show progress animation
-            progress_bar.progress(i * 0.1)
-            if i < 10:  # Don't sleep on the last iteration
-                time.sleep(estimated_time / 10)
-                
+        # Show initial progress
+        progress_bar.progress(0.1)
+        
+        # Log to help debug
+        st.session_state.last_action = "Creating vector store"
+        
+        # Create vector store (fixed parameter name from 'embedding' to 'embeddings')
         vector_store = Chroma.from_documents(
             documents=chunks, 
-            embedding=embeddings, 
+            embeddings=embeddings,  # Fixed parameter name
             persist_directory=persist_directory
         )
         
+        # Update progress and status
         progress_bar.progress(1.0)
-        status_text.text("Embeddings created successfully!")
+        status_text.text("✅ Embeddings created successfully!")
         time.sleep(0.5)
+        
+        # Cleanup UI elements
         progress_bar.empty()
         status_text.empty()
+        
+        # Log successful creation to session state for debugging
+        st.session_state.last_action = "Embeddings created successfully"
         
         return vector_store
         
     except Exception as e:
         st.error(f"Error creating embeddings: {str(e)}")
+        st.session_state.last_error = str(e)
         return None
 
 def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
@@ -254,8 +346,38 @@ def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
         st.error(f"Error loading embeddings: {str(e)}")
         return None
 
+# Main title with styled header
+st.markdown('<h1 class="main-header">📚 Q&A on Documents with AI</h1>', unsafe_allow_html=True)
+
+# Debug section (hidden in collapsed section)
+with st.expander("Debug Information", expanded=False):
+    if st.session_state.last_action:
+        st.info(f"Last action: {st.session_state.last_action}")
+    if st.session_state.last_error:
+        st.error(f"Last error: {st.session_state.last_error}")
+    if st.session_state.vector_store:
+        st.success("Vector store is available in session state")
+    else:
+        st.warning("No vector store in session state")
+        
+    # Debug buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Clear Error Log"):
+            st.session_state.last_error = None
+            st.experimental_rerun()
+    with col2:
+        if st.button("Reset Vector Store"):
+            st.session_state.vector_store = None
+            st.experimental_rerun()
+
 # Create tabs for different functionalities
-tab1, tab2, tab3 = st.tabs(["📄 Document Upload", "🌐 Wikipedia Search", "💬 Chat"])
+tab_options = ["📄 Document Upload", "🌐 Wikipedia Search", "💬 Chat"]
+tab1, tab2, tab3 = st.tabs(tab_options)
+
+# Function to switch active tab
+def set_active_tab(tab_index):
+    st.session_state.active_tab = tab_index
 
 # File Upload Tab
 with tab1:
@@ -306,18 +428,40 @@ with tab1:
                                 st.markdown(f"**Chunk {i+1}**")
                                 st.text(chunks[i].page_content[:200] + "...")
                                 
-                        # Create embeddings button
-                        create_embeddings_btn = st.button("Create Embeddings", key="create_doc_embeddings")
+                        # Create embeddings button with better styling
+                        create_embeddings_col1, create_embeddings_col2 = st.columns([3, 1])
+                        
+                        with create_embeddings_col1:
+                            create_embeddings_btn = st.button(
+                                "📊 Create Embeddings", 
+                                key="create_doc_embeddings",
+                                help="Process document and create vector embeddings for Q&A"
+                            )
                         
                         if create_embeddings_btn:
                             vector_store = create_embeddings_chroma(chunks)
+                            
                             if vector_store:
+                                # Save to session state
                                 st.session_state.vector_store = vector_store
-                                st.success("✅ Embeddings created and stored in ChromaDB!")
+                                st.session_state.last_action = "Document embeddings created successfully"
+                                
+                                # Success message with custom styling
+                                st.markdown(
+                                    '<div class="success-box">✅ Embeddings created and stored successfully!</div>',
+                                    unsafe_allow_html=True
+                                )
                                 st.balloons()
                                 
-                                # Switch to Chat tab
-                                st.info("You can now ask questions about your document in the Chat tab!")
+                                # Switch to Chat tab button
+                                if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_doc"):
+                                    set_active_tab(2)  # Index 2 is the Chat tab
+                                    st.experimental_rerun()
+                                else:
+                                    st.markdown(
+                                        '<div class="info-box">You can now ask questions about your document in the Chat tab!</div>',
+                                        unsafe_allow_html=True
+                                    )
 
 # Wikipedia Search Tab
 with tab2:
@@ -364,18 +508,40 @@ with tab2:
                                     st.markdown(f"**Chunk {i+1}**")
                                     st.text(wiki_chunks[i].page_content[:200] + "...")
                             
-                            # Create embeddings button
-                            create_wiki_embeddings_btn = st.button("Create Wikipedia Embeddings", key="create_wiki_embeddings")
+                            # Create embeddings button with better styling
+                            wiki_btn_col1, wiki_btn_col2 = st.columns([3, 1])
+                            
+                            with wiki_btn_col1:
+                                create_wiki_embeddings_btn = st.button(
+                                    "📊 Create Wikipedia Embeddings", 
+                                    key="create_wiki_embeddings",
+                                    help="Process Wikipedia articles and create vector embeddings for Q&A"
+                                )
                             
                             if create_wiki_embeddings_btn:
                                 vector_store = create_embeddings_chroma(wiki_chunks)
+                                
                                 if vector_store:
+                                    # Save to session state
                                     st.session_state.vector_store = vector_store
-                                    st.success("✅ Embeddings for Wikipedia data created and stored!")
+                                    st.session_state.last_action = "Wikipedia embeddings created successfully"
+                                    
+                                    # Success message with custom styling
+                                    st.markdown(
+                                        '<div class="success-box">✅ Wikipedia embeddings created and stored successfully!</div>',
+                                        unsafe_allow_html=True
+                                    )
                                     st.balloons()
                                     
-                                    # Switch to Chat tab
-                                    st.info("You can now ask questions about the Wikipedia content in the Chat tab!")
+                                    # Switch to Chat tab button
+                                    if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_wiki"):
+                                        set_active_tab(2)  # Index 2 is the Chat tab
+                                        st.experimental_rerun()
+                                    else:
+                                        st.markdown(
+                                            '<div class="info-box">You can now ask questions about Wikipedia content in the Chat tab!</div>',
+                                            unsafe_allow_html=True
+                                        )
                     else:
                         st.error(f"No articles found for '{wikipedia_query}'.")
                 
@@ -385,16 +551,35 @@ with tab2:
 
 # Chat Tab
 with tab3:
-    st.subheader("Chat with your Documents")
+    st.markdown('<h2 class="sub-header">💬 Chat with your Documents</h2>', unsafe_allow_html=True)
     
     if st.session_state.vector_store is None:
-        st.info("Please upload a document or search Wikipedia and create embeddings first.")
-        st.markdown("""
-        1. Go to the **Document Upload** tab to process your own files, or
-        2. Use the **Wikipedia Search** tab to fetch information on a topic
+        # Show professional looking message when no embeddings are available
+        st.markdown(
+            """
+            <div class="warning-box">
+                <h3>No Document Embeddings Available</h3>
+                <p>Please complete one of these steps first:</p>
+                <ol>
+                    <li>Upload and process a document in the <b>Document Upload</b> tab</li>
+                    <li>Search and process Wikipedia content in the <b>Wikipedia Search</b> tab</li>
+                </ol>
+                <p>After creating embeddings, return here to ask questions!</p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
         
-        After processing data, return here to ask questions!
-        """)
+        # Quick navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📄 Go to Document Upload", key="goto_doc_upload"):
+                set_active_tab(0)
+                st.experimental_rerun()
+        with col2:
+            if st.button("🌐 Go to Wikipedia Search", key="goto_wiki_search"):
+                set_active_tab(1)
+                st.experimental_rerun()
     else:
         # Setup retriever with k value from sidebar
         retriever = st.session_state.vector_store.as_retriever(
@@ -415,16 +600,45 @@ with tab3:
                 verbose=True
             )
         
-        # Chat interface
-        question = st.text_input("Ask a question about your document:", key="question_input")
+        # Professional chat interface
+        st.markdown(
+            '<div style="margin: 15px 0;">Ask a question about your documents:</div>', 
+            unsafe_allow_html=True
+        )
+        
+        # Input field with larger, more prominent styling
+        question = st.text_input(
+            "",  # No label as we use markdown above
+            key="question_input",
+            placeholder="Type your question here and press Enter...",
+            help="You can ask any question related to your uploaded document or Wikipedia content"
+        )
+        
+        # Special commands info
+        with st.expander("Special Commands", expanded=False):
+            st.markdown("""
+            - Type **clear** or **reset chat** to clear the conversation history
+            - Type **debug** to show debugging information
+            """)
         
         if question:
+            # Handle special commands
             if question.lower().strip() in ["clear", "clear chat", "reset", "reset chat"]:
                 st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
                 st.session_state.chat_history = []
-                st.success("Chat history cleared!")
+                st.markdown('<div class="success-box">Chat history cleared!</div>', unsafe_allow_html=True)
+            elif question.lower().strip() == "debug":
+                st.session_state.last_action = "Debug command triggered"
+                st.json({
+                    "vector_store_exists": st.session_state.vector_store is not None,
+                    "chat_history_length": len(st.session_state.chat_history),
+                    "token_usage": st.session_state.token_count,
+                    "last_action": st.session_state.last_action,
+                    "last_error": st.session_state.last_error
+                })
             else:
-                with st.spinner("Generating answer..."):
+                # Process regular questions
+                with st.spinner("🤔 Thinking..."):
                     with get_openai_callback() as cb:
                         try:
                             result = qa_chain({"question": question})
@@ -434,15 +648,17 @@ with tab3:
                             st.session_state.token_count["completion_tokens"] += cb.completion_tokens
                             st.session_state.token_count["total_tokens"] += cb.total_tokens
                             
-                            # Display answer
-                            st.markdown("### Answer:")
+                            # Display answer in a nicer format
+                            st.markdown('<div style="background-color: #f0f7ff; padding: 20px; border-radius: 10px; border-left: 5px solid #1E88E5; margin: 10px 0;">', unsafe_allow_html=True)
+                            st.markdown(f'<h3 style="color: #1E88E5;">Answer</h3>', unsafe_allow_html=True)
                             st.markdown(result["answer"])
+                            st.markdown('</div>', unsafe_allow_html=True)
                             
                             # Add to chat history
                             st.session_state.chat_history.append({"question": question, "answer": result["answer"]})
                             
-                            # Show source documents
-                            st.markdown("### Sources:")
+                            # Show source documents with better styling
+                            st.markdown('<h3 style="color: #1976D2; margin-top: 20px;">Sources</h3>', unsafe_allow_html=True)
                             source_docs = result["source_documents"]
                             
                             # Display unique source docs in expandable sections
