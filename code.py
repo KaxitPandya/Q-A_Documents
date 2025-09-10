@@ -336,11 +336,11 @@ def get_cached_embedding(text: str, model: str = "text-embedding-ada-002"):
 def load_document(file):
     """Load document based on its file type."""
     try:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
-        tmp_file.write(file.read())
-        tmp_file_path = tmp_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
+            tmp_file.write(file.read())
+            tmp_file_path = tmp_file.name
 
-    name, extension = os.path.splitext(file.name)
+        name, extension = os.path.splitext(file.name)
         
         if extension.lower() == ".pdf":
         loader = PyPDFLoader(tmp_file_path)
