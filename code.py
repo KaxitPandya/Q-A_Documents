@@ -116,18 +116,52 @@ if "active_tab" not in st.session_state:
 with st.sidebar:
     st.subheader("Configuration")
     
-    # API Key handling
+    # API Key handling - enhanced with visual confirmation
+    st.markdown("### API Key Configuration")
     api_key_option = st.radio("OpenAI API Key", ["Use from Secrets", "Enter Manually"])
     
+    api_key_status = None
+    
     if api_key_option == "Enter Manually":
-        api_key = st.text_input("OpenAI API Key", type="password")
+        api_key = st.text_input("OpenAI API Key", type="password", 
+                               help="Enter your OpenAI API key to use embeddings and Q&A features")
         if api_key:
             os.environ["OPENAI_API_KEY"] = api_key
+            st.session_state["api_key_set"] = True
+            api_key_status = True
+        else:
+            st.session_state["api_key_set"] = False
+            api_key_status = False
     else:
-        if "openai_api_key" not in st.secrets:
+        if "openai_api_key" in st.secrets:
+            os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
+            st.session_state["api_key_set"] = True
+            api_key_status = True
+        else:
             st.error("Please add your OpenAI API key to Streamlit secrets or enter it manually to proceed.")
-            st.stop()
-        os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
+            st.session_state["api_key_set"] = False
+            api_key_status = False
+    
+    # Visual confirmation of API key
+    if api_key_status is not None:
+        if api_key_status:
+            st.success("✅ API key configured successfully")
+            # Test the API connection button
+            if st.button("Test API Connection"):
+                try:
+                    # Try a simple completion to test connection
+                    from openai import OpenAI
+                    client = OpenAI()
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[{"role": "user", "content": "Hello!"}],
+                        max_tokens=5
+                    )
+                    st.success("✅ API connection successful!")
+                except Exception as e:
+                    st.error(f"❌ API connection failed: {str(e)}")
+        else:
+            st.warning("⚠️ No API key configured")
     
     # Model selection
     model_name = st.selectbox(
@@ -264,7 +298,7 @@ def chunk_data(data, chunk_size=256, chunk_overlap=0) -> List:
         st.error(f"Error chunking data: {str(e)}")
         return []
 
-def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optional[Chroma]:
+def create_embeddings_chroma(chunks, persist_directory='./chroma_db', use_local_embeddings=False) -> Optional[Chroma]:
     """
     Create and persist embeddings in ChromaDB.
     
@@ -280,25 +314,46 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
             st.error("No chunks to embed. Please check your document.")
             return None
         
-        # Show progress bar during embedding
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        # Calculate approx. time (rough estimate)
-        estimated_time = len(chunks) * 0.5  # Assume ~0.5s per chunk
-        status_text.text(f"Creating embeddings for {len(chunks)} chunks (est. {estimated_time:.1f}s)...")
-        
-        # Show initial progress
-        progress_bar.progress(0.1)
+        # Create a container for embedding process info
+        embedding_container = st.container()
+        with embedding_container:
+            st.info("🔄 Starting embedding process...")
+            
+            # Show progress bar during embedding
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Calculate approx. time (rough estimate)
+            estimated_time = len(chunks) * 0.5  # Assume ~0.5s per chunk
+            status_text.text(f"Creating embeddings for {len(chunks)} chunks (est. {estimated_time:.1f}s)...")
+            
+            # Show initial progress
+            progress_bar.progress(0.1)
         
         # Log to help debug
         st.session_state.last_action = "Creating vector store"
         
+        # Try using OpenAI embeddings first
         try:
-            # Create embeddings - wrap this in another try block for specific OpenAI errors
+            with embedding_container:
+                st.text("Using OpenAI embeddings...")
+                progress_bar.progress(0.3)
+            
+            # Get API key from session state or environment
+            api_key = os.environ.get("OPENAI_API_KEY", "")
+            if not api_key:
+                with embedding_container:
+                    st.error("No OpenAI API key found!")
+                    return None
+            
+            # Create embeddings
             embeddings = OpenAIEmbeddings()
             
             # Create vector store
+            with embedding_container:
+                progress_bar.progress(0.6)
+                status_text.text("Creating vector database...")
+            
             vector_store = Chroma.from_documents(
                 documents=chunks, 
                 embeddings=embeddings,
@@ -306,35 +361,53 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
             )
             
             # Update progress and status
-            progress_bar.progress(1.0)
-            status_text.text("✅ Embeddings created successfully!")
-            time.sleep(0.5)
+            with embedding_container:
+                progress_bar.progress(1.0)
+                status_text.text("✅ Embeddings created successfully!")
+                time.sleep(0.5)
             
-            # Cleanup UI elements
-            progress_bar.empty()
-            status_text.empty()
+            # Explicitly set vector store in session state
+            st.session_state["vector_store"] = vector_store
             
             # Log successful creation to session state for debugging
-            st.session_state.last_action = "Embeddings created successfully"
+            st.session_state["last_action"] = "Embeddings created successfully"
             
-            # Explicitly log that the vector store is set in session state
-            st.session_state.vector_store = vector_store
-            st.success("Vector store saved to session state successfully!")
+            with embedding_container:
+                st.success("Vector store saved to session state successfully!")
+                st.json({"status": "success", "chunks_processed": len(chunks)})
+            
+            # Debug information
+            st.write("Debug: Vector store created and saved to session state")
+            st.write(f"Session state keys: {list(st.session_state.keys())}")
             
             return vector_store
             
         except Exception as inner_e:
-            progress_bar.empty()
-            status_text.empty()
-            st.error(f"OpenAI API Error: {str(inner_e)}")
-            st.session_state.last_error = f"OpenAI API Error: {str(inner_e)}"
-            st.warning("Please check your OpenAI API key in the sidebar and try again.")
+            with embedding_container:
+                progress_bar.empty()
+                status_text.empty()
+                st.error(f"OpenAI API Error: {str(inner_e)}")
+                st.session_state.last_error = f"OpenAI API Error: {str(inner_e)}"
+                st.warning("Please check your OpenAI API key in the sidebar and try again.")
+                
+                # Debug info for API issues
+                st.write("API Debug Information:")
+                st.write(f"API key configured: {'Yes' if api_key else 'No'}")
+                st.write(f"API key length: {len(api_key) if api_key else 0}")
+                st.write(f"Error type: {type(inner_e).__name__}")
+            
             return None
         
     except Exception as e:
         st.error(f"Error creating embeddings: {str(e)}")
         st.session_state.last_error = str(e)
         st.warning("If you're seeing OpenAI API errors, please verify your API key is correct and has sufficient credits.")
+        
+        # More detailed error debugging
+        st.write("General Error Information:")
+        st.write(f"Error type: {type(e).__name__}")
+        st.write(f"Error details: {str(e)}")
+        
         return None
 
 def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
@@ -452,30 +525,48 @@ with tab1:
                                 help="Process document and create vector embeddings for Q&A"
                             )
                         
+                        # Show create embeddings button
                         if create_embeddings_btn:
-                            vector_store = create_embeddings_chroma(chunks)
+                            st.write("Button clicked! Starting embedding process...")
                             
-                            if vector_store:
-                                # Save to session state
-                                st.session_state.vector_store = vector_store
-                                st.session_state.last_action = "Document embeddings created successfully"
+                            # Store chunks in session state for reference
+                            st.session_state["current_chunks"] = chunks
+                            st.session_state["chunks_count"] = len(chunks)
+                            
+                            # Create embeddings
+                            with st.spinner("Creating embeddings... This may take a moment"):
+                                vector_store = create_embeddings_chroma(chunks)
                                 
-                                # Success message with custom styling
-                                st.markdown(
-                                    '<div class="success-box">✅ Embeddings created and stored successfully!</div>',
-                                    unsafe_allow_html=True
-                                )
-                                st.balloons()
-                                
-                                # Switch to Chat tab button
-                                if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_doc"):
-                                    set_active_tab(2)  # Index 2 is the Chat tab
-                                    st.rerun()
-                                else:
+                                if vector_store:
+                                    # We already set session state in the function, but let's be explicit here too
+                                    # This double-assignment is intentional for reliability
+                                    st.session_state["vector_store"] = vector_store
+                                    st.session_state["last_action"] = "Document embeddings created successfully"
+                                    
+                                    # Success messages
                                     st.markdown(
-                                        '<div class="info-box">You can now ask questions about your document in the Chat tab!</div>',
+                                        '<div class="success-box">✅ Embeddings created and stored successfully!</div>',
                                         unsafe_allow_html=True
                                     )
+                                    st.balloons()
+                                    
+                                    # Add a check to verify session state
+                                    if "vector_store" in st.session_state and st.session_state["vector_store"] is not None:
+                                        st.success("Session state verification: Vector store is present!")
+                                    else:
+                                        st.error("Session state verification: Vector store is MISSING!")
+                                    
+                                    # Switch to Chat tab button
+                                    if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_doc"):
+                                        set_active_tab(2)  # Index 2 is the Chat tab
+                                        st.rerun()
+                                    else:
+                                        st.markdown(
+                                            '<div class="info-box">You can now ask questions about your document in the Chat tab!</div>',
+                                            unsafe_allow_html=True
+                                        )
+                                else:
+                                    st.error("Failed to create embeddings. See error messages above.")
 
 # Wikipedia Search Tab
 with tab2:
@@ -532,30 +623,48 @@ with tab2:
                                     help="Process Wikipedia articles and create vector embeddings for Q&A"
                                 )
                             
+                            # Show create embeddings button for Wikipedia
                             if create_wiki_embeddings_btn:
-                                vector_store = create_embeddings_chroma(wiki_chunks)
+                                st.write("Button clicked! Starting Wikipedia embedding process...")
                                 
-                                if vector_store:
-                                    # Save to session state
-                                    st.session_state.vector_store = vector_store
-                                    st.session_state.last_action = "Wikipedia embeddings created successfully"
+                                # Store chunks in session state for reference
+                                st.session_state["current_chunks"] = wiki_chunks
+                                st.session_state["chunks_count"] = len(wiki_chunks)
+                                
+                                # Create embeddings
+                                with st.spinner("Creating Wikipedia embeddings... This may take a moment"):
+                                    vector_store = create_embeddings_chroma(wiki_chunks)
                                     
-                                    # Success message with custom styling
-                                    st.markdown(
-                                        '<div class="success-box">✅ Wikipedia embeddings created and stored successfully!</div>',
-                                        unsafe_allow_html=True
-                                    )
-                                    st.balloons()
-                                    
-                                    # Switch to Chat tab button
-                                    if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_wiki"):
-                                        set_active_tab(2)  # Index 2 is the Chat tab
-                                        st.rerun()
-                                    else:
+                                    if vector_store:
+                                        # We already set session state in the function, but let's be explicit here too
+                                        # This double-assignment is intentional for reliability
+                                        st.session_state["vector_store"] = vector_store
+                                        st.session_state["last_action"] = "Wikipedia embeddings created successfully"
+                                        
+                                        # Success messages
                                         st.markdown(
-                                            '<div class="info-box">You can now ask questions about Wikipedia content in the Chat tab!</div>',
+                                            '<div class="success-box">✅ Wikipedia embeddings created and stored successfully!</div>',
                                             unsafe_allow_html=True
                                         )
+                                        st.balloons()
+                                        
+                                        # Add a check to verify session state
+                                        if "vector_store" in st.session_state and st.session_state["vector_store"] is not None:
+                                            st.success("Session state verification: Vector store is present!")
+                                        else:
+                                            st.error("Session state verification: Vector store is MISSING!")
+                                        
+                                        # Switch to Chat tab button
+                                        if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_wiki"):
+                                            set_active_tab(2)  # Index 2 is the Chat tab
+                                            st.rerun()
+                                        else:
+                                            st.markdown(
+                                                '<div class="info-box">You can now ask questions about Wikipedia content in the Chat tab!</div>',
+                                                unsafe_allow_html=True
+                                            )
+                                    else:
+                                        st.error("Failed to create embeddings. See error messages above.")
                     else:
                         st.error(f"No articles found for '{wikipedia_query}'.")
                 
