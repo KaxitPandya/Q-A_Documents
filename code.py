@@ -11,12 +11,11 @@ from typing import List, Dict, Any, Optional
 
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader, WikipediaLoader, CSVLoader
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain_community.callbacks.manager import get_openai_callback
+from langchain_community.callbacks import get_openai_callback
 import chromadb
 
 # Page configuration for a professional look
@@ -573,6 +572,8 @@ with tab1:
                                 # Immediate feedback
                                 st.markdown("### Processing Request...")
                                 st.write("Button clicked successfully!")
+                                st.write(f"Debug: Button state = {create_embeddings_btn}")
+                                st.write(f"Debug: Chunks available = {len(st.session_state.get('document_chunks', []))}")
                                 
                                 # Create a status container
                                 status_container = st.container()
@@ -585,14 +586,14 @@ with tab1:
                                     st.session_state["chunks_count"] = len(chunks)
                                     st.success(f"Stored {len(chunks)} chunks in session state")
                                 
-                                st.info("Checking API key...")
-                                api_key = os.environ.get("OPENAI_API_KEY", "")
-                                if api_key:
-                                    st.success("API key found")
-                                else:
-                                    st.error("No API key found!")
-                                    st.stop()
-                                
+                                    st.info("Checking API key...")
+                                    api_key = os.environ.get("OPENAI_API_KEY", "")
+                                    if api_key:
+                                        st.success("API key found")
+                                    else:
+                                        st.error("No API key found!")
+                                        st.stop()
+                                    
                                     st.info("Creating embeddings...")
                                     
                                     # Try to create embeddings with detailed error handling
