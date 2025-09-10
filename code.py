@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain.callbacks import get_openai_callback
+from langchain_community.callbacks.manager import get_openai_callback
 import chromadb
 
 # Page configuration for a professional look
@@ -288,39 +288,53 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
         estimated_time = len(chunks) * 0.5  # Assume ~0.5s per chunk
         status_text.text(f"Creating embeddings for {len(chunks)} chunks (est. {estimated_time:.1f}s)...")
         
-        # Create embeddings
-        embeddings = OpenAIEmbeddings()
-        
         # Show initial progress
         progress_bar.progress(0.1)
         
         # Log to help debug
         st.session_state.last_action = "Creating vector store"
         
-        # Create vector store (fixed parameter name from 'embedding' to 'embeddings')
-        vector_store = Chroma.from_documents(
-            documents=chunks, 
-            embeddings=embeddings,  # Fixed parameter name
-            persist_directory=persist_directory
-        )
-        
-        # Update progress and status
-        progress_bar.progress(1.0)
-        status_text.text("✅ Embeddings created successfully!")
-        time.sleep(0.5)
-        
-        # Cleanup UI elements
-        progress_bar.empty()
-        status_text.empty()
-        
-        # Log successful creation to session state for debugging
-        st.session_state.last_action = "Embeddings created successfully"
-        
-        return vector_store
+        try:
+            # Create embeddings - wrap this in another try block for specific OpenAI errors
+            embeddings = OpenAIEmbeddings()
+            
+            # Create vector store
+            vector_store = Chroma.from_documents(
+                documents=chunks, 
+                embeddings=embeddings,
+                persist_directory=persist_directory
+            )
+            
+            # Update progress and status
+            progress_bar.progress(1.0)
+            status_text.text("✅ Embeddings created successfully!")
+            time.sleep(0.5)
+            
+            # Cleanup UI elements
+            progress_bar.empty()
+            status_text.empty()
+            
+            # Log successful creation to session state for debugging
+            st.session_state.last_action = "Embeddings created successfully"
+            
+            # Explicitly log that the vector store is set in session state
+            st.session_state.vector_store = vector_store
+            st.success("Vector store saved to session state successfully!")
+            
+            return vector_store
+            
+        except Exception as inner_e:
+            progress_bar.empty()
+            status_text.empty()
+            st.error(f"OpenAI API Error: {str(inner_e)}")
+            st.session_state.last_error = f"OpenAI API Error: {str(inner_e)}"
+            st.warning("Please check your OpenAI API key in the sidebar and try again.")
+            return None
         
     except Exception as e:
         st.error(f"Error creating embeddings: {str(e)}")
         st.session_state.last_error = str(e)
+        st.warning("If you're seeing OpenAI API errors, please verify your API key is correct and has sufficient credits.")
         return None
 
 def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
@@ -365,11 +379,11 @@ with st.expander("Debug Information", expanded=False):
     with col1:
         if st.button("Clear Error Log"):
             st.session_state.last_error = None
-            st.experimental_rerun()
+            st.rerun()
     with col2:
         if st.button("Reset Vector Store"):
             st.session_state.vector_store = None
-            st.experimental_rerun()
+            st.rerun()
 
 # Create tabs for different functionalities
 tab_options = ["📄 Document Upload", "🌐 Wikipedia Search", "💬 Chat"]
@@ -456,7 +470,7 @@ with tab1:
                                 # Switch to Chat tab button
                                 if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_doc"):
                                     set_active_tab(2)  # Index 2 is the Chat tab
-                                    st.experimental_rerun()
+                                    st.rerun()
                                 else:
                                     st.markdown(
                                         '<div class="info-box">You can now ask questions about your document in the Chat tab!</div>',
@@ -536,7 +550,7 @@ with tab2:
                                     # Switch to Chat tab button
                                     if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_wiki"):
                                         set_active_tab(2)  # Index 2 is the Chat tab
-                                        st.experimental_rerun()
+                                        st.rerun()
                                     else:
                                         st.markdown(
                                             '<div class="info-box">You can now ask questions about Wikipedia content in the Chat tab!</div>',
@@ -575,11 +589,11 @@ with tab3:
         with col1:
             if st.button("📄 Go to Document Upload", key="goto_doc_upload"):
                 set_active_tab(0)
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("🌐 Go to Wikipedia Search", key="goto_wiki_search"):
                 set_active_tab(1)
-                st.experimental_rerun()
+                st.rerun()
     else:
         # Setup retriever with k value from sidebar
         retriever = st.session_state.vector_store.as_retriever(
