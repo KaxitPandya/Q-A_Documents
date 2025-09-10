@@ -634,53 +634,53 @@ with tab1:
                                                 embeddings=embeddings
                                             )
                                             st.success("In-memory vector store created successfully!")
-                                    
-                                    # Save to session state
-                                    st.info("Saving to session state...")
-                                    st.session_state["vector_store"] = vector_store
-                                    st.session_state["last_action"] = "Document embeddings created successfully"
-                                    st.success("Saved to session state!")
-                                    
-                                    # Verify session state
-                                    if "vector_store" in st.session_state and st.session_state["vector_store"] is not None:
-                                        st.success("Session state verification: Vector store is present!")
                                         
-                                        # Success message
-                                        st.markdown(
-                                            '<div class="success-box">Embeddings created and stored successfully!</div>',
-                                            unsafe_allow_html=True
-                                        )
-                                        st.balloons()
+                                        # Save to session state
+                                        st.info("Saving to session state...")
+                                        st.session_state["vector_store"] = vector_store
+                                        st.session_state["last_action"] = "Document embeddings created successfully"
+                                        st.success("Saved to session state!")
                                         
-                                        # Navigation button
-                                        if st.button("Go to Chat Tab Now", key="go_to_chat_from_doc"):
-                                            set_active_tab(2)
-                                            safe_rerun()
-                                        else:
+                                        # Verify session state
+                                        if "vector_store" in st.session_state and st.session_state["vector_store"] is not None:
+                                            st.success("Session state verification: Vector store is present!")
+                                            
+                                            # Success message
                                             st.markdown(
-                                                '<div class="info-box">You can now ask questions about your document in the Chat tab!</div>',
+                                                '<div class="success-box">Embeddings created and stored successfully!</div>',
                                                 unsafe_allow_html=True
                                             )
-                                    else:
-                                        st.error("Session state verification failed!")
+                                            st.balloons()
+                                            
+                                            # Navigation button
+                                            if st.button("Go to Chat Tab Now", key="go_to_chat_from_doc"):
+                                                set_active_tab(2)
+                                                safe_rerun()
+                                            else:
+                                                st.markdown(
+                                                    '<div class="info-box">You can now ask questions about your document in the Chat tab!</div>',
+                                                    unsafe_allow_html=True
+                                                )
+                                        else:
+                                            st.error("Session state verification failed!")
+                                            
+                                    except Exception as e:
+                                        st.error(f"Error during embedding creation: {str(e)}")
+                                        st.write(f"Error type: {type(e).__name__}")
                                         
-                                except Exception as e:
-                                    st.error(f"Error during embedding creation: {str(e)}")
-                                    st.write(f"Error type: {type(e).__name__}")
-                                    
-                                    # Try alternative approach
-                                    st.info("Trying alternative approach...")
-                                    try:
-                                        # Alternative: Create without persist directory
-                                        vector_store = Chroma.from_documents(
-                                            documents=chunks, 
-                                            embeddings=embeddings
-                                        )
-                                        st.session_state["vector_store"] = vector_store
-                                        st.success("Alternative approach successful!")
-                                    except Exception as e2:
-                                        st.error(f"Alternative approach also failed: {str(e2)}")
-                                        st.write("Please check your OpenAI API key and try again.")
+                                        # Try alternative approach
+                                        st.info("Trying alternative approach...")
+                                        try:
+                                            # Alternative: Create without persist directory
+                                            vector_store = Chroma.from_documents(
+                                                documents=chunks, 
+                                                embeddings=embeddings
+                                            )
+                                            st.session_state["vector_store"] = vector_store
+                                            st.success("Alternative approach successful!")
+                                        except Exception as e2:
+                                            st.error(f"Alternative approach also failed: {str(e2)}")
+                                            st.write("Please check your OpenAI API key and try again.")
 
 # Wikipedia Search Tab
 with tab2:
