@@ -134,7 +134,7 @@ with st.sidebar:
             api_key_status = False
     else:
         if "openai_api_key" in st.secrets:
-os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
+            os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
             st.session_state["api_key_set"] = True
             api_key_status = True
         else:
