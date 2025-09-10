@@ -92,8 +92,6 @@ if "document_count" not in st.session_state:
     st.session_state.document_count = 0
 if "current_document" not in st.session_state:
     st.session_state.current_document = None
-if "loaded_sources" not in st.session_state:
-    st.session_state.loaded_sources = []
 if "retrieval_cache" not in st.session_state:
     st.session_state.retrieval_cache = {}
 if "streaming_response" not in st.session_state:
@@ -117,26 +115,12 @@ st.markdown("Upload documents or search Wikipedia to ask questions and get fast,
 with st.sidebar:
     st.header("⚙️ Settings")
     
-    # API Key configuration (from secrets only)
-    api_key = st.secrets.get("openai_api_key", os.environ.get("OPENAI_API_KEY", ""))
+    # API Key configuration
+    api_key = st.text_input("OpenAI API Key", type="password", value=st.secrets.get("openai_api_key", ""))
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
-        st.success("✅ API Key loaded")
     else:
-        st.error("❌ OpenAI API key not found!")
-        st.markdown("""
-        **To set up your API key:**
-        
-        1. Create `.streamlit/secrets.toml`:
-        ```toml
-        openai_api_key = "sk-..."
-        ```
-        
-        2. Or set environment variable:
-        ```bash
-        export OPENAI_API_KEY="sk-..."
-        ```
-        """)
+        st.error("Please enter your OpenAI API key to proceed.")
     
     st.divider()
     
@@ -272,28 +256,15 @@ with st.sidebar:
             st.session_state.vector_store = None
             st.session_state.document_count = 0
             st.session_state.current_document = None
-            st.session_state.loaded_sources = []
             st.session_state.retrieval_cache = {}
             st.success("Reset!")
     
     # Display stats
     st.divider()
     st.subheader("📊 Statistics")
-    st.metric("Total Sources", len(st.session_state.loaded_sources))
+    st.metric("Documents", st.session_state.document_count)
     st.metric("Messages", len(st.session_state.conversation_history))
     st.metric("Cache Size", len(st.session_state.retrieval_cache))
-    
-    # Show loaded sources
-    if st.session_state.loaded_sources:
-        st.subheader("📚 Loaded Sources")
-        for i, source in enumerate(st.session_state.loaded_sources):
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.text(f"• {source['name']} ({source['chunks']} chunks)")
-            with col2:
-                if st.button("❌", key=f"remove_{i}"):
-                    st.session_state.loaded_sources.pop(i)
-                    st.rerun()
 
 # Custom Prompts (Simplified for speed)
 QA_PROMPT = PromptTemplate(
@@ -336,19 +307,19 @@ def get_cached_embedding(text: str, model: str = "text-embedding-ada-002"):
 def load_document(file):
     """Load document based on its file type."""
     try:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
-        tmp_file.write(file.read())
-        tmp_file_path = tmp_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
+            tmp_file.write(file.read())
+            tmp_file_path = tmp_file.name
 
-    name, extension = os.path.splitext(file.name)
+        name, extension = os.path.splitext(file.name)
         
         if extension.lower() == ".pdf":
-        loader = PyPDFLoader(tmp_file_path)
+            loader = PyPDFLoader(tmp_file_path)
         elif extension.lower() == ".docx":
-        loader = Docx2txtLoader(tmp_file_path)
+            loader = Docx2txtLoader(tmp_file_path)
         elif extension.lower() == ".txt":
             loader = TextLoader(tmp_file_path, encoding='utf-8')
-    else:
+        else:
             st.error(f"Unsupported file format: {extension}")
             return None
 
@@ -398,7 +369,7 @@ def expand_query(query: str, llm) -> List[str]:
     except:
         return [query]
 
-def create_embeddings_chroma(chunks, collection_name="default", persist_directory='./chroma_db', add_to_existing=False):
+def create_embeddings_chroma(chunks, collection_name="default", persist_directory='./chroma_db'):
     """Create embeddings with progress tracking."""
     try:
         embeddings = OpenAIEmbeddings(
@@ -406,19 +377,15 @@ def create_embeddings_chroma(chunks, collection_name="default", persist_director
             chunk_size=1000
         )
         
-        if add_to_existing and st.session_state.vector_store is not None:
-            # Add to existing vector store
-            st.session_state.vector_store.add_documents(chunks)
-            return st.session_state.vector_store
-        else:
-            # Create new vector store
-            vector_store = Chroma.from_documents(
-                chunks,
-                embeddings,
-                collection_name=collection_name,
-                persist_directory=persist_directory
-            )
-    return vector_store
+        # Batch process for speed
+        vector_store = Chroma.from_documents(
+            chunks,
+            embeddings,
+            collection_name=collection_name,
+            persist_directory=persist_directory
+        )
+        
+        return vector_store
     except Exception as e:
         st.error(f"Error creating embeddings: {str(e)}")
         return None
@@ -478,7 +445,7 @@ with col1:
         type=["pdf", "docx", "txt"]
     )
     
-if uploaded_file:
+    if uploaded_file:
         file_details = {
             "Filename": uploaded_file.name,
             "FileType": uploaded_file.type,
@@ -486,49 +453,25 @@ if uploaded_file:
         }
         st.json(file_details)
         
-        # Add option to append or replace
-        if st.session_state.loaded_sources:
-            add_mode = st.radio(
-                "Add to existing sources or replace?",
-                ["Add to existing", "Replace all"],
-                index=0,
-                key="doc_add_mode"
-            )
-            add_to_existing = (add_mode == "Add to existing")
-        else:
-            add_to_existing = False
-        
         if st.button("📥 Process Document", type="primary"):
             with st.spinner("Processing..."):
                 start_time = time.time()
                 
                 # Load document
-        data = load_document(uploaded_file)
+                data = load_document(uploaded_file)
                 
-        if data:
+                if data:
                     # Chunk data
                     chunks = chunk_data(data, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
                     st.info(f"📄 {len(chunks)} chunks created")
                     
                     # Create embeddings
-                    collection_name = "combined_docs" if add_to_existing else f"doc_{get_file_hash(uploaded_file.getvalue())[:8]}"
-                    vector_store = create_embeddings_chroma(chunks, collection_name=collection_name, add_to_existing=add_to_existing)
+                    collection_name = f"doc_{get_file_hash(uploaded_file.getvalue())[:8]}"
+                    vector_store = create_embeddings_chroma(chunks, collection_name=collection_name)
                     
                     if vector_store:
-                st.session_state.vector_store = vector_store
-                        
-                        # Update sources tracking
-                        if not add_to_existing:
-                            st.session_state.loaded_sources = []
-                        
-                        st.session_state.loaded_sources.append({
-                            "name": uploaded_file.name,
-                            "type": "document",
-                            "chunks": len(chunks),
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        })
-                        
-                        st.session_state.document_count = len(st.session_state.loaded_sources)
+                        st.session_state.vector_store = vector_store
+                        st.session_state.document_count += 1
                         st.session_state.current_document = uploaded_file.name
                         st.session_state.retrieval_cache = {}  # Clear cache
                         
@@ -540,25 +483,12 @@ with col2:
     
     wikipedia_query = st.text_input("Enter a Wikipedia topic")
     
-if wikipedia_query:
-        # Add option to append or replace
-        if st.session_state.loaded_sources:
-            wiki_add_mode = st.radio(
-                "Add to existing sources or replace?",
-                ["Add to existing", "Replace all"],
-                index=0,
-                key="wiki_add_mode"
-            )
-            wiki_add_to_existing = (wiki_add_mode == "Add to existing")
-        else:
-            wiki_add_to_existing = False
-    
     if wikipedia_query and st.button("🔍 Search", type="primary"):
         with st.spinner("Searching..."):
             try:
                 start_time = time.time()
                 loader = WikipediaLoader(query=wikipedia_query, load_max_docs=1)  # Reduced for speed
-        wiki_data = loader.load()
+                wiki_data = loader.load()
                 
                 if wiki_data:
                     for doc in wiki_data:
@@ -567,24 +497,12 @@ if wikipedia_query:
                     wiki_chunks = chunk_data(wiki_data, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
                     st.info(f"📄 {len(wiki_chunks)} chunks created")
                     
-                    collection_name = "combined_docs" if wiki_add_to_existing else f"wiki_{hashlib.md5(wikipedia_query.encode()).hexdigest()[:8]}"
-                    vector_store = create_embeddings_chroma(wiki_chunks, collection_name=collection_name, add_to_existing=wiki_add_to_existing)
+                    collection_name = f"wiki_{hashlib.md5(wikipedia_query.encode()).hexdigest()[:8]}"
+                    vector_store = create_embeddings_chroma(wiki_chunks, collection_name=collection_name)
                     
                     if vector_store:
-                st.session_state.vector_store = vector_store
-                        
-                        # Update sources tracking
-                        if not wiki_add_to_existing:
-                            st.session_state.loaded_sources = []
-                        
-                        st.session_state.loaded_sources.append({
-                            "name": f"Wikipedia: {wikipedia_query}",
-                            "type": "wikipedia",
-                            "chunks": len(wiki_chunks),
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        })
-                        
-                        st.session_state.document_count = len(st.session_state.loaded_sources)
+                        st.session_state.vector_store = vector_store
+                        st.session_state.document_count += len(wiki_data)
                         st.session_state.current_document = f"Wikipedia: {wikipedia_query}"
                         st.session_state.retrieval_cache = {}  # Clear cache
                         
@@ -599,12 +517,8 @@ st.divider()
 st.header("💬 Ask Questions")
 
 if st.session_state.vector_store and api_key:
-    # Display all loaded sources
-    if st.session_state.loaded_sources:
-        sources_summary = ", ".join([s["name"] for s in st.session_state.loaded_sources])
-        total_chunks = sum(s["chunks"] for s in st.session_state.loaded_sources)
-        st.info(f"📚 **Loaded sources ({len(st.session_state.loaded_sources)})**: {sources_summary}")
-        st.caption(f"Total chunks: {total_chunks}")
+    if st.session_state.current_document:
+        st.info(f"📄 Current: **{st.session_state.current_document}**")
     
     # Initialize LLM with streaming
     llm = ChatOpenAI(
@@ -706,23 +620,23 @@ if st.session_state.vector_store and api_key:
                 
                 # Create QA chain with streaming
                 streaming_handler = StreamlitCallbackHandler(response_placeholder)
-    
-    qa_chain = ConversationalRetrievalChain.from_llm(
+                
+                qa_chain = ConversationalRetrievalChain.from_llm(
                     llm=ChatOpenAI(
                         model=model_name,
                         temperature=temperature,
                         streaming=True,
                         callbacks=[streaming_handler]
                     ),
-        retriever=retriever,
-        memory=st.session_state.memory,
+                    retriever=retriever,
+                    memory=st.session_state.memory,
                     chain_type="stuff",
                     return_source_documents=True,
                     combine_docs_chain_kwargs={"prompt": QA_PROMPT}
-    )
-
+                )
+                
                 # Get answer
-            result = qa_chain({"question": question})
+                result = qa_chain({"question": question})
                 
                 # Calculate total time
                 total_time = time.time() - start_time
@@ -799,7 +713,7 @@ if st.session_state.vector_store and api_key:
     
 else:
     if not api_key:
-        st.warning("⚠️ Please set your OpenAI API key in Streamlit secrets or environment variables.")
+        st.warning("⚠️ Please enter your OpenAI API key in the sidebar.")
     else:
         st.info("📤 Please upload a document or search Wikipedia to start.")
 
