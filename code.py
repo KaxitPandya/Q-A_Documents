@@ -22,7 +22,7 @@ import chromadb
 # Page configuration for a professional look
 st.set_page_config(
     page_title="Q&A on Documents",
-    page_icon="📚",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -145,7 +145,7 @@ with st.sidebar:
     # Visual confirmation of API key
     if api_key_status is not None:
         if api_key_status:
-            st.success("✅ API key configured successfully")
+            st.success("API key configured successfully")
             # Test the API connection button
             if st.button("Test API Connection"):
                 try:
@@ -157,11 +157,11 @@ with st.sidebar:
                         messages=[{"role": "user", "content": "Hello!"}],
                         max_tokens=5
                     )
-                    st.success("✅ API connection successful!")
+                    st.success("API connection successful!")
                 except Exception as e:
-                    st.error(f"❌ API connection failed: {str(e)}")
+                    st.error(f"API connection failed: {str(e)}")
         else:
-            st.warning("⚠️ No API key configured")
+            st.warning("No API key configured")
     
     # Model selection
     model_name = st.selectbox(
@@ -312,12 +312,12 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
     try:
         if not chunks or len(chunks) == 0:
             st.error("No chunks to embed. Please check your document.")
-            return None
-        
+        return None
+
         # Create a container for embedding process info
         embedding_container = st.container()
         with embedding_container:
-            st.info("🔄 Starting embedding process...")
+            st.info("Starting embedding process...")
             
             # Show progress bar during embedding
             progress_bar = st.progress(0)
@@ -363,7 +363,7 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
             # Update progress and status
             with embedding_container:
                 progress_bar.progress(1.0)
-                status_text.text("✅ Embeddings created successfully!")
+                status_text.text("Embeddings created successfully!")
                 time.sleep(0.5)
             
             # Explicitly set vector store in session state
@@ -425,7 +425,7 @@ def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
             st.warning(f"No embeddings found at {persist_directory}. Please create embeddings first.")
             return None
             
-        embeddings = OpenAIEmbeddings()
+    embeddings = OpenAIEmbeddings()
         vector_store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
         return vector_store
         
@@ -434,10 +434,10 @@ def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
         return None
 
 # Main title with styled header
-st.markdown('<h1 class="main-header">📚 Q&A on Documents with AI</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">Q&A on Documents with AI</h1>', unsafe_allow_html=True)
 
 # Debug section (hidden in collapsed section)
-with st.expander("🔧 Debug Information", expanded=False):
+with st.expander("Debug Information", expanded=False):
     st.markdown("### Session State Debug")
     
     # Show all session state keys
@@ -449,16 +449,16 @@ with st.expander("🔧 Debug Information", expanded=False):
     if st.session_state.get("last_error"):
         st.error(f"Last error: {st.session_state.last_error}")
     if st.session_state.get("vector_store"):
-        st.success("✅ Vector store is available in session state")
+        st.success("Vector store is available in session state")
     else:
-        st.warning("⚠️ No vector store in session state")
+        st.warning("No vector store in session state")
     
     # Show API key status
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if api_key:
-        st.success(f"✅ API key configured (length: {len(api_key)})")
+        st.success(f"API key configured (length: {len(api_key)})")
     else:
-        st.error("❌ No API key found in environment")
+        st.error("No API key found in environment")
     
     # Show chunks info
     if st.session_state.get("chunks_count"):
@@ -484,12 +484,12 @@ with st.expander("🔧 Debug Information", expanded=False):
                     messages=[{"role": "user", "content": "Hello!"}],
                     max_tokens=5
                 )
-                st.success("✅ API key works!")
+                st.success("API key works!")
             except Exception as e:
-                st.error(f"❌ API key test failed: {str(e)}")
+                st.error(f"API key test failed: {str(e)}")
 
 # Create tabs for different functionalities
-tab_options = ["📄 Document Upload", "🌐 Wikipedia Search", "💬 Chat"]
+tab_options = ["Document Upload", "Wikipedia Search", "Chat"]
 tab1, tab2, tab3 = st.tabs(tab_options)
 
 # Function to switch active tab
@@ -508,7 +508,7 @@ def safe_rerun():
 
 # File Upload Tab
 with tab1:
-    st.subheader("Upload Your Document")
+st.subheader("Upload Your Document")
     uploaded_file = st.file_uploader(
         "Choose a file (PDF, DOCX, TXT, CSV)", 
         type=["pdf", "docx", "txt", "csv"]
@@ -516,7 +516,7 @@ with tab1:
     
     col1, col2 = st.columns(2)
     
-    if uploaded_file:
+if uploaded_file:
         # Display file info
         file_details = {
             "Filename": uploaded_file.name,
@@ -533,9 +533,9 @@ with tab1:
         process_doc = st.button("Process Document", key="process_doc")
         
         if process_doc:
-            with st.spinner("Loading document..."):
-                data = load_document(uploaded_file)
-                if data:
+    with st.spinner("Loading document..."):
+        data = load_document(uploaded_file)
+        if data:
                     st.success(f"Document loaded successfully! Found {len(data)} pages/sections.")
                     
                     # Get chunk parameters from sidebar
@@ -546,8 +546,8 @@ with tab1:
                     )
                     
                     if chunks:
-                        st.write(f"Document split into {len(chunks)} chunks.")
-                        
+            st.write(f"Document split into {len(chunks)} chunks.")
+
                         # Display sample chunks
                         with st.expander("View sample chunks"):
                             sample_size = min(3, len(chunks))
@@ -555,76 +555,76 @@ with tab1:
                                 st.markdown(f"**Chunk {i+1}**")
                                 st.text(chunks[i].page_content[:200] + "...")
                                 
-                        # Create embeddings button with better styling
-                        create_embeddings_col1, create_embeddings_col2 = st.columns([3, 1])
-                        
-                        with create_embeddings_col1:
-                            create_embeddings_btn = st.button(
-                                "📊 Create Embeddings", 
-                                key="create_doc_embeddings",
-                                help="Process document and create vector embeddings for Q&A"
-                            )
+        # Create embeddings button with better styling
+        create_embeddings_col1, create_embeddings_col2 = st.columns([3, 1])
+        
+        with create_embeddings_col1:
+            create_embeddings_btn = st.button(
+                "Create Embeddings", 
+                key="create_doc_embeddings",
+                help="Process document and create vector embeddings for Q&A"
+            )
                         
                         # Create embeddings button with immediate feedback
                         if create_embeddings_btn:
                             # Immediate feedback
-                            st.markdown("### 🔄 Processing Request...")
-                            st.write("✅ Button clicked successfully!")
+                            st.markdown("### Processing Request...")
+                            st.write("Button clicked successfully!")
                             
                             # Create a status container
                             status_container = st.container()
                             
                             with status_container:
-                                st.info("📋 Storing document chunks...")
+                                st.info("Storing document chunks...")
                                 # Store chunks in session state for reference
                                 st.session_state["current_chunks"] = chunks
                                 st.session_state["chunks_count"] = len(chunks)
-                                st.success(f"✅ Stored {len(chunks)} chunks in session state")
+                                st.success(f"Stored {len(chunks)} chunks in session state")
                                 
-                                st.info("🔑 Checking API key...")
+                                st.info("Checking API key...")
                                 api_key = os.environ.get("OPENAI_API_KEY", "")
                                 if api_key:
-                                    st.success("✅ API key found")
+                                    st.success("API key found")
                                 else:
-                                    st.error("❌ No API key found!")
+                                    st.error("No API key found!")
                                     st.stop()
                                 
-                                st.info("🤖 Creating embeddings...")
+                                st.info("Creating embeddings...")
                                 
                                 # Try to create embeddings with detailed error handling
                                 try:
                                     # Create embeddings object
                                     embeddings = OpenAIEmbeddings()
-                                    st.success("✅ Embeddings object created")
+                                    st.success("Embeddings object created")
                                     
                                     # Create vector store
-                                    st.info("📊 Building vector database...")
+                                    st.info("Building vector database...")
                                     vector_store = Chroma.from_documents(
                                         documents=chunks, 
                                         embeddings=embeddings,
                                         persist_directory='./chroma_db'
                                     )
-                                    st.success("✅ Vector store created successfully!")
+                                    st.success("Vector store created successfully!")
                                     
                                     # Save to session state
-                                    st.info("💾 Saving to session state...")
+                                    st.info("Saving to session state...")
                                     st.session_state["vector_store"] = vector_store
                                     st.session_state["last_action"] = "Document embeddings created successfully"
-                                    st.success("✅ Saved to session state!")
+                                    st.success("Saved to session state!")
                                     
                                     # Verify session state
                                     if "vector_store" in st.session_state and st.session_state["vector_store"] is not None:
-                                        st.success("✅ Session state verification: Vector store is present!")
+                                        st.success("Session state verification: Vector store is present!")
                                         
                                         # Success message
                                         st.markdown(
-                                            '<div class="success-box">🎉 Embeddings created and stored successfully!</div>',
+                                            '<div class="success-box">Embeddings created and stored successfully!</div>',
                                             unsafe_allow_html=True
                                         )
                                         st.balloons()
                                         
                                         # Navigation button
-                                        if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_doc"):
+                                        if st.button("Go to Chat Tab Now", key="go_to_chat_from_doc"):
                                             set_active_tab(2)
                                             safe_rerun()
                                         else:
@@ -633,14 +633,14 @@ with tab1:
                                                 unsafe_allow_html=True
                                             )
                                     else:
-                                        st.error("❌ Session state verification failed!")
+                                        st.error("Session state verification failed!")
                                         
                                 except Exception as e:
-                                    st.error(f"❌ Error during embedding creation: {str(e)}")
+                                    st.error(f"Error during embedding creation: {str(e)}")
                                     st.write(f"Error type: {type(e).__name__}")
                                     
                                     # Try alternative approach
-                                    st.info("🔄 Trying alternative approach...")
+                                    st.info("Trying alternative approach...")
                                     try:
                                         # Alternative: Create without persist directory
                                         vector_store = Chroma.from_documents(
@@ -648,14 +648,14 @@ with tab1:
                                             embeddings=embeddings
                                         )
                                         st.session_state["vector_store"] = vector_store
-                                        st.success("✅ Alternative approach successful!")
+                                        st.success("Alternative approach successful!")
                                     except Exception as e2:
-                                        st.error(f"❌ Alternative approach also failed: {str(e2)}")
+                                        st.error(f"Alternative approach also failed: {str(e2)}")
                                         st.write("Please check your OpenAI API key and try again.")
 
 # Wikipedia Search Tab
 with tab2:
-    st.subheader("Search Wikipedia")
+st.subheader("Search Wikipedia")
     
     col1, col2 = st.columns([3, 1])
     
@@ -665,18 +665,18 @@ with tab2:
     with col2:
         wiki_max_docs = st.number_input("Max articles", min_value=1, max_value=5, value=2)
     
-    if wikipedia_query:
+if wikipedia_query:
         search_wiki = st.button("Search Wikipedia", key="search_wiki")
         
         if search_wiki:
-            with st.spinner("Fetching data from Wikipedia..."):
+    with st.spinner("Fetching data from Wikipedia..."):
                 try:
                     loader = WikipediaLoader(
                         query=wikipedia_query, 
                         load_max_docs=wiki_max_docs,
                         lang="en"
                     )
-                    wiki_data = loader.load()
+        wiki_data = loader.load()
                     
                     if wiki_data:
                         st.success(f"Found {len(wiki_data)} Wikipedia articles.")
@@ -703,7 +703,7 @@ with tab2:
                             
                             with wiki_btn_col1:
                                 create_wiki_embeddings_btn = st.button(
-                                    "📊 Create Wikipedia Embeddings", 
+                                    "Create Wikipedia Embeddings", 
                                     key="create_wiki_embeddings",
                                     help="Process Wikipedia articles and create vector embeddings for Q&A"
                                 )
@@ -711,63 +711,63 @@ with tab2:
                             # Create embeddings button for Wikipedia with immediate feedback
                             if create_wiki_embeddings_btn:
                                 # Immediate feedback
-                                st.markdown("### 🔄 Processing Wikipedia Request...")
-                                st.write("✅ Wikipedia button clicked successfully!")
+                                st.markdown("### Processing Wikipedia Request...")
+                                st.write("Wikipedia button clicked successfully!")
                                 
                                 # Create a status container
                                 wiki_status_container = st.container()
                                 
                                 with wiki_status_container:
-                                    st.info("📋 Storing Wikipedia chunks...")
+                                    st.info("Storing Wikipedia chunks...")
                                     # Store chunks in session state for reference
                                     st.session_state["current_chunks"] = wiki_chunks
                                     st.session_state["chunks_count"] = len(wiki_chunks)
-                                    st.success(f"✅ Stored {len(wiki_chunks)} Wikipedia chunks in session state")
+                                    st.success(f"Stored {len(wiki_chunks)} Wikipedia chunks in session state")
                                     
-                                    st.info("🔑 Checking API key...")
+                                    st.info("Checking API key...")
                                     api_key = os.environ.get("OPENAI_API_KEY", "")
                                     if api_key:
-                                        st.success("✅ API key found")
+                                        st.success("API key found")
                                     else:
-                                        st.error("❌ No API key found!")
+                                        st.error("No API key found!")
                                         st.stop()
                                     
-                                    st.info("🤖 Creating Wikipedia embeddings...")
+                                    st.info("Creating Wikipedia embeddings...")
                                     
                                     # Try to create embeddings with detailed error handling
                                     try:
                                         # Create embeddings object
                                         embeddings = OpenAIEmbeddings()
-                                        st.success("✅ Embeddings object created")
+                                        st.success("Embeddings object created")
                                         
                                         # Create vector store
-                                        st.info("📊 Building Wikipedia vector database...")
+                                        st.info("Building Wikipedia vector database...")
                                         vector_store = Chroma.from_documents(
                                             documents=wiki_chunks, 
                                             embeddings=embeddings,
                                             persist_directory='./chroma_db'
                                         )
-                                        st.success("✅ Wikipedia vector store created successfully!")
+                                        st.success("Wikipedia vector store created successfully!")
                                         
                                         # Save to session state
-                                        st.info("💾 Saving to session state...")
+                                        st.info("Saving to session state...")
                                         st.session_state["vector_store"] = vector_store
                                         st.session_state["last_action"] = "Wikipedia embeddings created successfully"
-                                        st.success("✅ Saved to session state!")
+                                        st.success("Saved to session state!")
                                         
                                         # Verify session state
                                         if "vector_store" in st.session_state and st.session_state["vector_store"] is not None:
-                                            st.success("✅ Session state verification: Vector store is present!")
+                                            st.success("Session state verification: Vector store is present!")
                                             
                                             # Success message
                                             st.markdown(
-                                                '<div class="success-box">🎉 Wikipedia embeddings created and stored successfully!</div>',
+                                                '<div class="success-box">Wikipedia embeddings created and stored successfully!</div>',
                                                 unsafe_allow_html=True
                                             )
                                             st.balloons()
                                             
                                             # Navigation button
-                                            if st.button("💬 Go to Chat Tab Now", key="go_to_chat_from_wiki"):
+                                            if st.button("Go to Chat Tab Now", key="go_to_chat_from_wiki"):
                                                 set_active_tab(2)
                                                 safe_rerun()
                                             else:
@@ -776,14 +776,14 @@ with tab2:
                                                     unsafe_allow_html=True
                                                 )
                                         else:
-                                            st.error("❌ Session state verification failed!")
+                                            st.error("Session state verification failed!")
                                             
                                     except Exception as e:
-                                        st.error(f"❌ Error during Wikipedia embedding creation: {str(e)}")
+                                        st.error(f"Error during Wikipedia embedding creation: {str(e)}")
                                         st.write(f"Error type: {type(e).__name__}")
                                         
                                         # Try alternative approach
-                                        st.info("🔄 Trying alternative approach...")
+                                        st.info("Trying alternative approach...")
                                         try:
                                             # Alternative: Create without persist directory
                                             vector_store = Chroma.from_documents(
@@ -791,9 +791,9 @@ with tab2:
                                                 embeddings=embeddings
                                             )
                                             st.session_state["vector_store"] = vector_store
-                                            st.success("✅ Alternative approach successful!")
+                                            st.success("Alternative approach successful!")
                                         except Exception as e2:
-                                            st.error(f"❌ Alternative approach also failed: {str(e2)}")
+                                            st.error(f"Alternative approach also failed: {str(e2)}")
                                             st.write("Please check your OpenAI API key and try again.")
                     else:
                         st.error(f"No articles found for '{wikipedia_query}'.")
@@ -804,7 +804,7 @@ with tab2:
 
 # Chat Tab
 with tab3:
-    st.markdown('<h2 class="sub-header">💬 Chat with your Documents</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="sub-header">Chat with your Documents</h2>', unsafe_allow_html=True)
     
     if st.session_state.vector_store is None:
         # Show professional looking message when no embeddings are available
@@ -826,11 +826,11 @@ with tab3:
         # Quick navigation buttons
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("📄 Go to Document Upload", key="goto_doc_upload"):
+            if st.button("Go to Document Upload", key="goto_doc_upload"):
                 set_active_tab(0)
                 safe_rerun()
         with col2:
-            if st.button("🌐 Go to Wikipedia Search", key="goto_wiki_search"):
+            if st.button("Go to Wikipedia Search", key="goto_wiki_search"):
                 set_active_tab(1)
                 safe_rerun()
     else:
@@ -842,13 +842,13 @@ with tab3:
         
         # Setup the QA chain
         with st.spinner("Setting up the chat system..."):
-            qa_chain = ConversationalRetrievalChain.from_llm(
+    qa_chain = ConversationalRetrievalChain.from_llm(
                 llm=ChatOpenAI(
                     model=model_name,
                     temperature=temperature
                 ),
-                retriever=retriever,
-                memory=st.session_state.memory,
+        retriever=retriever,
+        memory=st.session_state.memory,
                 return_source_documents=True,
                 verbose=True
             )
@@ -874,7 +874,7 @@ with tab3:
             - Type **debug** to show debugging information
             """)
         
-        if question:
+    if question:
             # Handle special commands
             if question.lower().strip() in ["clear", "clear chat", "reset", "reset chat"]:
                 st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -891,10 +891,10 @@ with tab3:
                 })
             else:
                 # Process regular questions
-                with st.spinner("🤔 Thinking..."):
+                with st.spinner("Thinking..."):
                     with get_openai_callback() as cb:
                         try:
-                            result = qa_chain({"question": question})
+            result = qa_chain({"question": question})
                             
                             # Update token count
                             st.session_state.token_count["prompt_tokens"] += cb.prompt_tokens
