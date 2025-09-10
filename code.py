@@ -233,22 +233,22 @@ def load_document(file) -> Optional[List]:
         List of document chunks or None if file format is unsupported
     """
     try:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
-        tmp_file.write(file.read())
-        tmp_file_path = tmp_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp_file:
+            tmp_file.write(file.read())
+            tmp_file_path = tmp_file.name
 
-    name, extension = os.path.splitext(file.name)
+        name, extension = os.path.splitext(file.name)
         extension = extension.lower()
         
-    if extension == ".pdf":
-        loader = PyPDFLoader(tmp_file_path)
-    elif extension == ".docx":
-        loader = Docx2txtLoader(tmp_file_path)
-    elif extension == ".txt":
-        loader = TextLoader(tmp_file_path)
+        if extension == ".pdf":
+            loader = PyPDFLoader(tmp_file_path)
+        elif extension == ".docx":
+            loader = Docx2txtLoader(tmp_file_path)
+        elif extension == ".txt":
+            loader = TextLoader(tmp_file_path)
         elif extension == ".csv":
             loader = CSVLoader(tmp_file_path)
-    else:
+        else:
             st.error(f"Unsupported file format: {extension}! Please upload PDF, DOCX, TXT, or CSV files.")
             os.unlink(tmp_file_path)  # Clean up temp file
             return None
@@ -298,7 +298,7 @@ def chunk_data(data, chunk_size=256, chunk_overlap=0) -> List:
         st.error(f"Error chunking data: {str(e)}")
         return []
 
-def create_embeddings_chroma(chunks, persist_directory='./chroma_db', use_local_embeddings=False) -> Optional[Chroma]:
+def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optional[Chroma]:
     """
     Create and persist embeddings in ChromaDB.
     
@@ -347,7 +347,7 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db', use_local_
                     return None
             
             # Create embeddings
-    embeddings = OpenAIEmbeddings()
+            embeddings = OpenAIEmbeddings()
             
             # Create vector store
             with embedding_container:
@@ -380,8 +380,8 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db', use_local_
             st.write("Debug: Vector store created and saved to session state")
             st.write(f"Session state keys: {list(st.session_state.keys())}")
             
-    return vector_store
-
+            return vector_store
+            
         except Exception as inner_e:
             with embedding_container:
                 progress_bar.empty()
@@ -425,7 +425,7 @@ def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
             st.warning(f"No embeddings found at {persist_directory}. Please create embeddings first.")
             return None
             
-    embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings()
         vector_store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
         return vector_store
         
@@ -469,11 +469,11 @@ with st.expander("🔧 Debug Information", expanded=False):
     with col1:
         if st.button("Clear Error Log"):
             st.session_state.last_error = None
-                                            safe_rerun()
+            st.rerun()
     with col2:
         if st.button("Reset Vector Store"):
             st.session_state.vector_store = None
-                                            safe_rerun()
+            st.rerun()
     with col3:
         if st.button("Test API Key"):
             try:
@@ -499,7 +499,7 @@ def set_active_tab(tab_index):
 # Safe rerun function to handle version differences
 def safe_rerun():
     try:
-                                            safe_rerun()
+        st.rerun()
     except AttributeError:
         try:
             st.experimental_rerun()
@@ -508,7 +508,7 @@ def safe_rerun():
 
 # File Upload Tab
 with tab1:
-st.subheader("Upload Your Document")
+    st.subheader("Upload Your Document")
     uploaded_file = st.file_uploader(
         "Choose a file (PDF, DOCX, TXT, CSV)", 
         type=["pdf", "docx", "txt", "csv"]
@@ -516,7 +516,7 @@ st.subheader("Upload Your Document")
     
     col1, col2 = st.columns(2)
     
-if uploaded_file:
+    if uploaded_file:
         # Display file info
         file_details = {
             "Filename": uploaded_file.name,
@@ -533,9 +533,9 @@ if uploaded_file:
         process_doc = st.button("Process Document", key="process_doc")
         
         if process_doc:
-    with st.spinner("Loading document..."):
-        data = load_document(uploaded_file)
-        if data:
+            with st.spinner("Loading document..."):
+                data = load_document(uploaded_file)
+                if data:
                     st.success(f"Document loaded successfully! Found {len(data)} pages/sections.")
                     
                     # Get chunk parameters from sidebar
@@ -546,8 +546,8 @@ if uploaded_file:
                     )
                     
                     if chunks:
-            st.write(f"Document split into {len(chunks)} chunks.")
-
+                        st.write(f"Document split into {len(chunks)} chunks.")
+                        
                         # Display sample chunks
                         with st.expander("View sample chunks"):
                             sample_size = min(3, len(chunks))
@@ -655,7 +655,7 @@ if uploaded_file:
 
 # Wikipedia Search Tab
 with tab2:
-st.subheader("Search Wikipedia")
+    st.subheader("Search Wikipedia")
     
     col1, col2 = st.columns([3, 1])
     
@@ -665,18 +665,18 @@ st.subheader("Search Wikipedia")
     with col2:
         wiki_max_docs = st.number_input("Max articles", min_value=1, max_value=5, value=2)
     
-if wikipedia_query:
+    if wikipedia_query:
         search_wiki = st.button("Search Wikipedia", key="search_wiki")
         
         if search_wiki:
-    with st.spinner("Fetching data from Wikipedia..."):
+            with st.spinner("Fetching data from Wikipedia..."):
                 try:
                     loader = WikipediaLoader(
                         query=wikipedia_query, 
                         load_max_docs=wiki_max_docs,
                         lang="en"
                     )
-        wiki_data = loader.load()
+                    wiki_data = loader.load()
                     
                     if wiki_data:
                         st.success(f"Found {len(wiki_data)} Wikipedia articles.")
@@ -842,13 +842,13 @@ with tab3:
         
         # Setup the QA chain
         with st.spinner("Setting up the chat system..."):
-    qa_chain = ConversationalRetrievalChain.from_llm(
+            qa_chain = ConversationalRetrievalChain.from_llm(
                 llm=ChatOpenAI(
                     model=model_name,
                     temperature=temperature
                 ),
-        retriever=retriever,
-        memory=st.session_state.memory,
+                retriever=retriever,
+                memory=st.session_state.memory,
                 return_source_documents=True,
                 verbose=True
             )
@@ -874,7 +874,7 @@ with tab3:
             - Type **debug** to show debugging information
             """)
         
-    if question:
+        if question:
             # Handle special commands
             if question.lower().strip() in ["clear", "clear chat", "reset", "reset chat"]:
                 st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -894,7 +894,7 @@ with tab3:
                 with st.spinner("🤔 Thinking..."):
                     with get_openai_callback() as cb:
                         try:
-            result = qa_chain({"question": question})
+                            result = qa_chain({"question": question})
                             
                             # Update token count
                             st.session_state.token_count["prompt_tokens"] += cb.prompt_tokens
