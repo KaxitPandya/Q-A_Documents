@@ -312,7 +312,7 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
     try:
         if not chunks or len(chunks) == 0:
             st.error("No chunks to embed. Please check your document.")
-        return None
+            return None
 
         # Create a container for embedding process info
         embedding_container = st.container()
@@ -381,7 +381,7 @@ def create_embeddings_chroma(chunks, persist_directory='./chroma_db') -> Optiona
             st.write(f"Session state keys: {list(st.session_state.keys())}")
             
             return vector_store
-            
+
         except Exception as inner_e:
             with embedding_container:
                 progress_bar.empty()
@@ -425,7 +425,7 @@ def load_embeddings_chroma(persist_directory='./chroma_db') -> Optional[Chroma]:
             st.warning(f"No embeddings found at {persist_directory}. Please create embeddings first.")
             return None
             
-    embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings()
         vector_store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
         return vector_store
         
@@ -508,7 +508,7 @@ def safe_rerun():
 
 # File Upload Tab
 with tab1:
-st.subheader("Upload Your Document")
+    st.subheader("Upload Your Document")
     uploaded_file = st.file_uploader(
         "Choose a file (PDF, DOCX, TXT, CSV)", 
         type=["pdf", "docx", "txt", "csv"]
@@ -516,7 +516,7 @@ st.subheader("Upload Your Document")
     
     col1, col2 = st.columns(2)
     
-if uploaded_file:
+    if uploaded_file:
         # Display file info
         file_details = {
             "Filename": uploaded_file.name,
@@ -533,9 +533,9 @@ if uploaded_file:
         process_doc = st.button("Process Document", key="process_doc")
         
         if process_doc:
-    with st.spinner("Loading document..."):
-        data = load_document(uploaded_file)
-        if data:
+            with st.spinner("Loading document..."):
+                data = load_document(uploaded_file)
+                if data:
                     st.success(f"Document loaded successfully! Found {len(data)} pages/sections.")
                     
                     # Get chunk parameters from sidebar
@@ -546,7 +546,7 @@ if uploaded_file:
                     )
                     
                     if chunks:
-            st.write(f"Document split into {len(chunks)} chunks.")
+                        st.write(f"Document split into {len(chunks)} chunks.")
 
                         # Display sample chunks
                         with st.expander("View sample chunks"):
@@ -555,31 +555,35 @@ if uploaded_file:
                                 st.markdown(f"**Chunk {i+1}**")
                                 st.text(chunks[i].page_content[:200] + "...")
                                 
-        # Create embeddings button with better styling
-        create_embeddings_col1, create_embeddings_col2 = st.columns([3, 1])
-        
-        with create_embeddings_col1:
-            create_embeddings_btn = st.button(
-                "Create Embeddings", 
-                key="create_doc_embeddings",
-                help="Process document and create vector embeddings for Q&A"
-            )
+                        # Store chunks in session state for later use
+                        st.session_state["document_chunks"] = chunks
                         
-                        # Create embeddings button with immediate feedback
-                        if create_embeddings_btn:
-                            # Immediate feedback
-                            st.markdown("### Processing Request...")
-                            st.write("Button clicked successfully!")
-                            
-                            # Create a status container
-                            status_container = st.container()
-                            
-                            with status_container:
-                                st.info("Storing document chunks...")
-                                # Store chunks in session state for reference
-                                st.session_state["current_chunks"] = chunks
-                                st.session_state["chunks_count"] = len(chunks)
-                                st.success(f"Stored {len(chunks)} chunks in session state")
+                        # Create embeddings button with better styling
+                        create_embeddings_col1, create_embeddings_col2 = st.columns([3, 1])
+                        
+                        with create_embeddings_col1:
+                            create_embeddings_btn = st.button(
+                                "Create Embeddings", 
+                                key="create_doc_embeddings",
+                                help="Process document and create vector embeddings for Q&A"
+                            )
+                        
+                            # Create embeddings button with immediate feedback
+                            if create_embeddings_btn:
+                                # Immediate feedback
+                                st.markdown("### Processing Request...")
+                                st.write("Button clicked successfully!")
+                                
+                                # Create a status container
+                                status_container = st.container()
+                                
+                                with status_container:
+                                    st.info("Storing document chunks...")
+                                    # Get chunks from session state
+                                    chunks = st.session_state.get("document_chunks", [])
+                                    st.session_state["current_chunks"] = chunks
+                                    st.session_state["chunks_count"] = len(chunks)
+                                    st.success(f"Stored {len(chunks)} chunks in session state")
                                 
                                 st.info("Checking API key...")
                                 api_key = os.environ.get("OPENAI_API_KEY", "")
@@ -589,22 +593,47 @@ if uploaded_file:
                                     st.error("No API key found!")
                                     st.stop()
                                 
-                                st.info("Creating embeddings...")
-                                
-                                # Try to create embeddings with detailed error handling
-                                try:
-                                    # Create embeddings object
-                                    embeddings = OpenAIEmbeddings()
-                                    st.success("Embeddings object created")
+                                    st.info("Creating embeddings...")
                                     
-                                    # Create vector store
-                                    st.info("Building vector database...")
-                                    vector_store = Chroma.from_documents(
-                                        documents=chunks, 
-                                        embeddings=embeddings,
-                                        persist_directory='./chroma_db'
-                                    )
-                                    st.success("Vector store created successfully!")
+                                    # Try to create embeddings with detailed error handling
+                                    try:
+                                        # Validate chunks exist
+                                        if not chunks or len(chunks) == 0:
+                                            st.error("No chunks available to embed!")
+                                            st.stop()
+                                        
+                                        # Create embeddings object with explicit API key
+                                        st.info("Initializing OpenAI embeddings...")
+                                        try:
+                                            embeddings = OpenAIEmbeddings(
+                                                openai_api_key=api_key,
+                                                model="text-embedding-ada-002"
+                                            )
+                                            st.success("Embeddings object created")
+                                        except Exception as embed_error:
+                                            st.error(f"Failed to create embeddings object: {str(embed_error)}")
+                                            st.info("Common causes: Invalid API key, network issues, or API quota exceeded")
+                                            raise
+                                        
+                                        # Create vector store
+                                        st.info("Building vector database...")
+                                        try:
+                                            # First try with persist directory
+                                            vector_store = Chroma.from_documents(
+                                                documents=chunks, 
+                                                embeddings=embeddings,
+                                                persist_directory='./chroma_db'
+                                            )
+                                            st.success("Vector store created successfully!")
+                                        except Exception as chroma_error:
+                                            st.warning(f"Failed to create persistent vector store: {str(chroma_error)}")
+                                            st.info("Trying in-memory vector store...")
+                                            # Fallback to in-memory store
+                                            vector_store = Chroma.from_documents(
+                                                documents=chunks, 
+                                                embeddings=embeddings
+                                            )
+                                            st.success("In-memory vector store created successfully!")
                                     
                                     # Save to session state
                                     st.info("Saving to session state...")
@@ -655,7 +684,7 @@ if uploaded_file:
 
 # Wikipedia Search Tab
 with tab2:
-st.subheader("Search Wikipedia")
+    st.subheader("Search Wikipedia")
     
     col1, col2 = st.columns([3, 1])
     
@@ -665,18 +694,18 @@ st.subheader("Search Wikipedia")
     with col2:
         wiki_max_docs = st.number_input("Max articles", min_value=1, max_value=5, value=2)
     
-if wikipedia_query:
+    if wikipedia_query:
         search_wiki = st.button("Search Wikipedia", key="search_wiki")
         
         if search_wiki:
-    with st.spinner("Fetching data from Wikipedia..."):
+            with st.spinner("Fetching data from Wikipedia..."):
                 try:
                     loader = WikipediaLoader(
                         query=wikipedia_query, 
                         load_max_docs=wiki_max_docs,
                         lang="en"
                     )
-        wiki_data = loader.load()
+                    wiki_data = loader.load()
                     
                     if wiki_data:
                         st.success(f"Found {len(wiki_data)} Wikipedia articles.")
@@ -697,6 +726,9 @@ if wikipedia_query:
                                 for i in range(sample_size):
                                     st.markdown(f"**Chunk {i+1}**")
                                     st.text(wiki_chunks[i].page_content[:200] + "...")
+                            
+                            # Store chunks in session state for later use
+                            st.session_state["wiki_chunks"] = wiki_chunks
                             
                             # Create embeddings button with better styling
                             wiki_btn_col1, wiki_btn_col2 = st.columns([3, 1])
@@ -719,7 +751,8 @@ if wikipedia_query:
                                 
                                 with wiki_status_container:
                                     st.info("Storing Wikipedia chunks...")
-                                    # Store chunks in session state for reference
+                                    # Get chunks from session state
+                                    wiki_chunks = st.session_state.get("wiki_chunks", [])
                                     st.session_state["current_chunks"] = wiki_chunks
                                     st.session_state["chunks_count"] = len(wiki_chunks)
                                     st.success(f"Stored {len(wiki_chunks)} Wikipedia chunks in session state")
@@ -736,18 +769,43 @@ if wikipedia_query:
                                     
                                     # Try to create embeddings with detailed error handling
                                     try:
-                                        # Create embeddings object
-                                        embeddings = OpenAIEmbeddings()
-                                        st.success("Embeddings object created")
+                                        # Validate chunks exist
+                                        if not wiki_chunks or len(wiki_chunks) == 0:
+                                            st.error("No Wikipedia chunks available to embed!")
+                                            st.stop()
+                                        
+                                        # Create embeddings object with explicit API key
+                                        st.info("Initializing OpenAI embeddings...")
+                                        try:
+                                            embeddings = OpenAIEmbeddings(
+                                                openai_api_key=api_key,
+                                                model="text-embedding-ada-002"
+                                            )
+                                            st.success("Embeddings object created")
+                                        except Exception as embed_error:
+                                            st.error(f"Failed to create embeddings object: {str(embed_error)}")
+                                            st.info("Common causes: Invalid API key, network issues, or API quota exceeded")
+                                            raise
                                         
                                         # Create vector store
                                         st.info("Building Wikipedia vector database...")
-                                        vector_store = Chroma.from_documents(
-                                            documents=wiki_chunks, 
-                                            embeddings=embeddings,
-                                            persist_directory='./chroma_db'
-                                        )
-                                        st.success("Wikipedia vector store created successfully!")
+                                        try:
+                                            # First try with persist directory
+                                            vector_store = Chroma.from_documents(
+                                                documents=wiki_chunks, 
+                                                embeddings=embeddings,
+                                                persist_directory='./chroma_db'
+                                            )
+                                            st.success("Wikipedia vector store created successfully!")
+                                        except Exception as chroma_error:
+                                            st.warning(f"Failed to create persistent vector store: {str(chroma_error)}")
+                                            st.info("Trying in-memory vector store...")
+                                            # Fallback to in-memory store
+                                            vector_store = Chroma.from_documents(
+                                                documents=wiki_chunks, 
+                                                embeddings=embeddings
+                                            )
+                                            st.success("In-memory Wikipedia vector store created successfully!")
                                         
                                         # Save to session state
                                         st.info("Saving to session state...")
@@ -842,13 +900,13 @@ with tab3:
         
         # Setup the QA chain
         with st.spinner("Setting up the chat system..."):
-    qa_chain = ConversationalRetrievalChain.from_llm(
+            qa_chain = ConversationalRetrievalChain.from_llm(
                 llm=ChatOpenAI(
                     model=model_name,
                     temperature=temperature
                 ),
-        retriever=retriever,
-        memory=st.session_state.memory,
+                retriever=retriever,
+                memory=st.session_state.memory,
                 return_source_documents=True,
                 verbose=True
             )
@@ -874,7 +932,7 @@ with tab3:
             - Type **debug** to show debugging information
             """)
         
-    if question:
+        if question:
             # Handle special commands
             if question.lower().strip() in ["clear", "clear chat", "reset", "reset chat"]:
                 st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -894,7 +952,7 @@ with tab3:
                 with st.spinner("Thinking..."):
                     with get_openai_callback() as cb:
                         try:
-            result = qa_chain({"question": question})
+                            result = qa_chain({"question": question})
                             
                             # Update token count
                             st.session_state.token_count["prompt_tokens"] += cb.prompt_tokens
