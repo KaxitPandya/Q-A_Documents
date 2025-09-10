@@ -115,14 +115,14 @@ st.markdown("Upload documents or search Wikipedia to ask questions and get fast,
 with st.sidebar:
     st.header("⚙️ Settings")
     
-    # API Key configuration
-    api_key = st.text_input("OpenAI API Key", type="password", value=st.secrets.get("openai_api_key", ""))
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
-    else:
-        st.error("Please enter your OpenAI API key to proceed.")
+    # # API Key configuration
+    # api_key = st.text_input("OpenAI API Key", type="password", value=st.secrets.get("openai_api_key", ""))
+    # if api_key:
+    #     os.environ["OPENAI_API_KEY"] = api_key
+    # else:
+    #     st.error("Please enter your OpenAI API key to proceed.")
     
-    st.divider()
+    # st.divider()
     
     # Performance Mode
     st.subheader("⚡ Performance Settings")
