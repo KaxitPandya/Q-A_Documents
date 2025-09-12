@@ -430,7 +430,7 @@ def format_conversation_history():
             
             formatted_history.append(
                 f'<div class="assistant-message">🤖 **Assistant:** {msg["content"]}<br>'
-                f'<span class="{confidence_class}">Confidence: {confidence_emoji} {confidence:.0%}</span> {time_str}</div>'
+                # f'<span class="{confidence_class}">Confidence: {confidence_emoji} {confidence:.0%}</span> {time_str}</div>'
             )
             
             if "sources" in msg and msg["sources"]:
