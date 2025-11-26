@@ -66,9 +66,9 @@ except ImportError:
 
 # === Document type ===
 try:
-    from langchain.schema import Document
+    from langchain_community.document_loaders.base import Document
 except ImportError:
-    from langchain_core.schema import Document
+    from langchain.schema import Document
 
 
 # Page config
