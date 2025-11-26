@@ -65,10 +65,12 @@ except ImportError:
     from langchain_classic.retrievers.document_compressors import LLMChainExtractor
 
 # === Document type ===
-try:
-    from langchain_community.document_loaders.base import Document
-except ImportError:
-    from langchain.schema import Document
+from dataclasses import dataclass
+
+@dataclass
+class Document:
+    page_content: str
+    metadata: dict
 
 
 # Page config
