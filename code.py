@@ -9,7 +9,7 @@ from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, Te
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain, LLMChain
 from langchain.memory import ConversationBufferMemory
 from langchain.callbacks import StreamingStdOutCallbackHandler
