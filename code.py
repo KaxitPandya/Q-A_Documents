@@ -1,8 +1,7 @@
-# q-a_documents/code.py (top)  -- or whichever file you use
-import sys
-import pysqlite3
-# Map pysqlite3 to sqlite3 (needed in some hosted environments / Chromadb setups)
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# Removed legacy pysqlite3 workaround as Python 3.12+ includes modern sqlite3
+# If you use sqlite3 directly, you can use:
+# import sqlite3
+# Otherwise, most libraries (like chromadb) will detect the standard sqlite3.
 
 import streamlit as st
 import os
@@ -15,141 +14,61 @@ import time
 from functools import lru_cache
 import pickle
 
-# === document loaders / chroma / embeddings / providers ===
+# === LangChain / Main Libraries (modern imports) ===
 from langchain_community.document_loaders import (
     PyPDFLoader,
     Docx2txtLoader,
     TextLoader,
     WikipediaLoader,
 )
-
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 
-# === text splitter (robust) ===
+# === Robust Text Splitter ===
 try:
-    # dedicated package (recommended)
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-except Exception:
-    try:
-        # older location / fallback
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-    except Exception:
-        try:
-            from langchain.text_splitters import RecursiveCharacterTextSplitter
-        except Exception as e:
-            raise ImportError(
-                "RecursiveCharacterTextSplitter not found. Install 'langchain-text-splitters' or use a compatible LangChain."
-            ) from e
+except ImportError as e:
+    raise ImportError("Install 'langchain-text-splitters'.") from e
 
-# === chains / memory / prompts ===
-# ConversationalRetrievalChain and LLMChain historically lived on langchain.chains
-# Newer LangChain v1 deprecates some of these; prefer langchain_classic if available.
+# === Chains / Memory / Prompts ===
 try:
-    # compatibility package restores pre-v1 surfaces
     from langchain_classic.chains import ConversationalRetrievalChain, LLMChain
-except Exception:
-    try:
-        # older pre-v1 direct import (works for many installs)
-        from langchain.chains import ConversationalRetrievalChain, LLMChain
-    except Exception as e:
-        raise ImportError(
-            "ConversationalRetrievalChain/LLMChain not available. Install 'langchain-classic' "
-            "or migrate to LangChain v1 APIs (create_retrieval_chain / new chain factories)."
-        ) from e
+except ImportError:
+    from langchain.chains import ConversationalRetrievalChain, LLMChain
 
-# Memory
 try:
     from langchain.memory import ConversationBufferMemory
-except Exception:
-    try:
-        from langchain_classic.memory import ConversationBufferMemory
-    except Exception as e:
-        raise ImportError("ConversationBufferMemory import failed. Install 'langchain-classic'.") from e
+except ImportError:
+    from langchain_classic.memory import ConversationBufferMemory
 
-# Callbacks (single consistent import)
-# Robust StreamingStdOutCallbackHandler / BaseCallbackHandler import
-StreamingStdOutCallbackHandler = None
-BaseCallbackHandler = None
-
-# Try the handler locations in order of likelihood
+# === Callback Handlers ===
 try:
-    # preferred modern explicit handler
     from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-    BaseCallbackHandler = getattr(__import__("langchain.callbacks.base", fromlist=["BaseCallbackHandler"]), "BaseCallbackHandler", None)
-except Exception:
-    try:
-        # some builds expose handler directly from callbacks
-        from langchain.callbacks import StreamingStdOutCallbackHandler
-        # base handler if present
-        try:
-            from langchain.callbacks.base import BaseCallbackHandler
-        except Exception:
-            BaseCallbackHandler = None
-    except Exception:
-        try:
-            # fallback to legacy compatibility package
-            from langchain_classic.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-            try:
-                from langchain_classic.callbacks.base import BaseCallbackHandler
-            except Exception:
-                BaseCallbackHandler = None
-        except Exception:
-            # Final fallback: define a minimal no-op handler so the app can run.
-            class StreamingStdOutCallbackHandler:
-                """No-op fallback handler used when LangChain callback classes aren't available."""
-                def __init__(self, *args, **kwargs):
-                    pass
-                def __call__(self, *args, **kwargs):
-                    return None
-            class BaseCallbackHandler(StreamingStdOutCallbackHandler):
-                pass
+    from langchain.callbacks.base import BaseCallbackHandler
+except ImportError:
+    from langchain_classic.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+    from langchain_classic.callbacks.base import BaseCallbackHandler
 
-
-# PromptTemplate fallback (same pattern as main.py)
+# === Prompt Template (modern location) ===
 try:
     from langchain_core.prompts.prompt import PromptTemplate
-except Exception:
-    try:
-        from langchain_core.prompts import PromptTemplate
-    except Exception:
-        try:
-            from langchain.prompts import PromptTemplate
-        except Exception:
-            try:
-                from langchain_classic.prompts import PromptTemplate
-            except Exception as e:
-                raise ImportError("PromptTemplate import failed. Install 'langchain-classic' or use langchain_core.") from e
+except ImportError:
+    from langchain_classic.prompts import PromptTemplate
 
-# Retrievers / compressors (robust attempts)
+# === Retrievers & Compressors ===
 try:
     from langchain.retrievers import ContextualCompressionRetriever
     from langchain.retrievers.document_compressors import LLMChainExtractor
-except Exception:
-    try:
-        # some installs expose these directly under langchain_classic
-        from langchain_classic.retrievers import ContextualCompressionRetriever
-        from langchain_classic.retrievers.document_compressors import LLMChainExtractor
-    except Exception:
-        # keep going — if these are missing you'll need to either install the compatibility package
-        # or change to the v1 equivalent (create_retrieval_chain + compressor factories).
-        ContextualCompressionRetriever = None
-        LLMChainExtractor = None
+except ImportError:
+    from langchain_classic.retrievers import ContextualCompressionRetriever
+    from langchain_classic.retrievers.document_compressors import LLMChainExtractor
 
-# LangChain Document type (stable across versions)
+# === Document type ===
 try:
     from langchain.schema import Document
-except Exception:
-    try:
-        from langchain_core.schema import Document
-    except Exception:
-        # fallback: create a minimal Document dataclass if absolutely necessary
-        from dataclasses import dataclass
-        @dataclass
-        class Document:
-            page_content: str
-            metadata: dict
+except ImportError:
+    from langchain_core.schema import Document
 
 
 # Page config
