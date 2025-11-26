@@ -1,25 +1,12 @@
+# q-a_documents/code.py (top)  -- or whichever file you use
 import sys
 import pysqlite3
+# Map pysqlite3 to sqlite3 (needed in some hosted environments / Chromadb setups)
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import os
 import tempfile
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader, WikipediaLoader
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_openai import ChatOpenAI
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.chains import ConversationalRetrievalChain, LLMChain
-from langchain.memory import ConversationBufferMemory
-from langchain.callbacks import StreamingStdOutCallbackHandler
-from langchain.prompts import PromptTemplate
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import LLMChainExtractor
-from langchain.schema import Document
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.callbacks.base import BaseCallbackHandler
-import chromadb
 from datetime import datetime
 import hashlib
 import re
@@ -27,6 +14,115 @@ from typing import List, Any, Dict
 import time
 from functools import lru_cache
 import pickle
+
+# === document loaders / chroma / embeddings / providers ===
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    Docx2txtLoader,
+    TextLoader,
+    WikipediaLoader,
+)
+
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
+
+# === text splitter (robust) ===
+try:
+    # dedicated package (recommended)
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except Exception:
+    try:
+        # older location / fallback
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+    except Exception:
+        try:
+            from langchain.text_splitters import RecursiveCharacterTextSplitter
+        except Exception as e:
+            raise ImportError(
+                "RecursiveCharacterTextSplitter not found. Install 'langchain-text-splitters' or use a compatible LangChain."
+            ) from e
+
+# === chains / memory / prompts ===
+# ConversationalRetrievalChain and LLMChain historically lived on langchain.chains
+# Newer LangChain v1 deprecates some of these; prefer langchain_classic if available.
+try:
+    # compatibility package restores pre-v1 surfaces
+    from langchain_classic.chains import ConversationalRetrievalChain, LLMChain
+except Exception:
+    try:
+        # older pre-v1 direct import (works for many installs)
+        from langchain.chains import ConversationalRetrievalChain, LLMChain
+    except Exception as e:
+        raise ImportError(
+            "ConversationalRetrievalChain/LLMChain not available. Install 'langchain-classic' "
+            "or migrate to LangChain v1 APIs (create_retrieval_chain / new chain factories)."
+        ) from e
+
+# Memory
+try:
+    from langchain.memory import ConversationBufferMemory
+except Exception:
+    try:
+        from langchain_classic.memory import ConversationBufferMemory
+    except Exception as e:
+        raise ImportError("ConversationBufferMemory import failed. Install 'langchain-classic'.") from e
+
+# Callbacks (single consistent import)
+try:
+    from langchain.callbacks import StreamingStdOutCallbackHandler
+except Exception:
+    try:
+        # older / alternate path
+        from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+    except Exception:
+        # fall back to base if specific handler isn't available
+        from langchain.callbacks.base import BaseCallbackHandler as StreamingStdOutCallbackHandler
+
+# PromptTemplate fallback (same pattern as main.py)
+try:
+    from langchain_core.prompts.prompt import PromptTemplate
+except Exception:
+    try:
+        from langchain_core.prompts import PromptTemplate
+    except Exception:
+        try:
+            from langchain.prompts import PromptTemplate
+        except Exception:
+            try:
+                from langchain_classic.prompts import PromptTemplate
+            except Exception as e:
+                raise ImportError("PromptTemplate import failed. Install 'langchain-classic' or use langchain_core.") from e
+
+# Retrievers / compressors (robust attempts)
+try:
+    from langchain.retrievers import ContextualCompressionRetriever
+    from langchain.retrievers.document_compressors import LLMChainExtractor
+except Exception:
+    try:
+        # some installs expose these directly under langchain_classic
+        from langchain_classic.retrievers import ContextualCompressionRetriever
+        from langchain_classic.retrievers.document_compressors import LLMChainExtractor
+    except Exception:
+        # keep going — if these are missing you'll need to either install the compatibility package
+        # or change to the v1 equivalent (create_retrieval_chain + compressor factories).
+        ContextualCompressionRetriever = None
+        LLMChainExtractor = None
+
+# LangChain Document type (stable across versions)
+try:
+    from langchain.schema import Document
+except Exception:
+    try:
+        from langchain_core.schema import Document
+    except Exception:
+        # fallback: create a minimal Document dataclass if absolutely necessary
+        from dataclasses import dataclass
+        @dataclass
+        class Document:
+            page_content: str
+            metadata: dict
+
 
 # Page config
 st.set_page_config(
