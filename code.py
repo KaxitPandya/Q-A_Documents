@@ -650,7 +650,7 @@ if st.session_state.vector_store and api_key:
                         expanded_queries = expand_query(question, llm)
                         all_docs = []
                         for q in expanded_queries:
-                            docs = retriever(q)
+                            docs = retriever.invoke(q)
                             all_docs.extend(docs)
                         
                         # Remove duplicates
@@ -662,7 +662,7 @@ if st.session_state.vector_store and api_key:
                                 seen.add(doc_hash)
                                 relevant_docs.append(doc)
                     else:
-                        relevant_docs = retriever(question)
+                        relevant_docs = retriever.invoke(question)
                     
                     retrieval_time = time.time() - retrieval_start
                     
