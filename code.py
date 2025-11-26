@@ -69,15 +69,43 @@ except Exception:
         raise ImportError("ConversationBufferMemory import failed. Install 'langchain-classic'.") from e
 
 # Callbacks (single consistent import)
+# Robust StreamingStdOutCallbackHandler / BaseCallbackHandler import
+StreamingStdOutCallbackHandler = None
+BaseCallbackHandler = None
+
+# Try the handler locations in order of likelihood
 try:
-    from langchain.callbacks import StreamingStdOutCallbackHandler
+    # preferred modern explicit handler
+    from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+    BaseCallbackHandler = getattr(__import__("langchain.callbacks.base", fromlist=["BaseCallbackHandler"]), "BaseCallbackHandler", None)
 except Exception:
     try:
-        # older / alternate path
-        from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+        # some builds expose handler directly from callbacks
+        from langchain.callbacks import StreamingStdOutCallbackHandler
+        # base handler if present
+        try:
+            from langchain.callbacks.base import BaseCallbackHandler
+        except Exception:
+            BaseCallbackHandler = None
     except Exception:
-        # fall back to base if specific handler isn't available
-        from langchain.callbacks.base import BaseCallbackHandler as StreamingStdOutCallbackHandler
+        try:
+            # fallback to legacy compatibility package
+            from langchain_classic.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+            try:
+                from langchain_classic.callbacks.base import BaseCallbackHandler
+            except Exception:
+                BaseCallbackHandler = None
+        except Exception:
+            # Final fallback: define a minimal no-op handler so the app can run.
+            class StreamingStdOutCallbackHandler:
+                """No-op fallback handler used when LangChain callback classes aren't available."""
+                def __init__(self, *args, **kwargs):
+                    pass
+                def __call__(self, *args, **kwargs):
+                    return None
+            class BaseCallbackHandler(StreamingStdOutCallbackHandler):
+                pass
+
 
 # PromptTemplate fallback (same pattern as main.py)
 try:
