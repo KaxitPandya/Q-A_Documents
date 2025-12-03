@@ -1,0 +1,90 @@
+name: Keep Streamlit Awake
+
+# every 6 hours: at minute 0, every 6th hour
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}  # allows manual run from Actions UI
+
+jobs:
+  keep-awake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies (puppeteer)
+        run: |
+          npm ci --no-package-lock || true
+          # create a minimal package.json if not present
+          if [ ! -f package.json ]; then
+            npm init -y
+          fi
+          npm i puppeteer@21 --no-audit --no-fund
+
+      - name: Run headless visit script
+        env:
+          APP_URL: "https://instagram-caption-generator-smudvyyr8eprlaxctt6ulg.streamlit.app/"
+          # optional: change WAIT_MS if your app is slow to load
+          WAIT_MS: "15000"
+          NAV_TIMEOUT_MS: "90000"
+        run: |
+          node <<'NODE'
+          const puppeteer = require('puppeteer');
+          const url = process.env.APP_URL;
+          const waitMs = parseInt(process.env.WAIT_MS || '15000', 10);
+          const navTimeout = parseInt(process.env.NAV_TIMEOUT_MS || '90000', 10);
+
+          (async () => {
+            console.log('Visiting', url);
+            const browser = await puppeteer.launch({
+              args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            });
+            const page = await browser.newPage();
+            page.setDefaultNavigationTimeout(navTimeout);
+
+            try {
+              // go to page and wait for network idle (good for SPAs)
+              await page.goto(url, { waitUntil: 'networkidle2' });
+              console.log('Loaded page — waiting', waitMs, 'ms for content to stabilize');
+              await page.waitForTimeout(waitMs);
+
+              // Attempt to click a Wake / Open / Continue button if it exists
+              // You can add more selectors if your app uses different text
+              const selectors = [
+                'button:has-text("Wake")',
+                'button:has-text("Wake app")',
+                'button:has-text("Open")',
+                'button:has-text("Continue")'
+              ];
+
+              for (const sel of selectors) {
+                try {
+                  const el = await page.$(sel);
+                  if (el) {
+                    console.log('Found selector:', sel, '— clicking it.');
+                    await el.click();
+                    await page.waitForTimeout(3000);
+                    break;
+                  }
+                } catch (e) {
+                  // ignore and continue
+                }
+              }
+
+              console.log('Visit complete.');
+            } catch (err) {
+              console.error('Visit failed:', err && err.message ? err.message : err);
+              process.exitCode = 1;
+            } finally {
+              await browser.close();
+            }
+          })();
+          NODE
