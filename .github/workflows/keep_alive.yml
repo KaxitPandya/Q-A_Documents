@@ -31,7 +31,7 @@ jobs:
 
       - name: Run headless visit script
         env:
-          APP_URL: "https://instagram-caption-generator-smudvyyr8eprlaxctt6ulg.streamlit.app/"
+          APP_URL: "https://q-adocuments.streamlit.app"
           # optional: change WAIT_MS if your app is slow to load
           WAIT_MS: "15000"
           NAV_TIMEOUT_MS: "90000"
