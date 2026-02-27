@@ -1,0 +1,22 @@
+# Environment
+.env
+__pycache__/
+*.pyc
+
+# ChromaDB persistence
+chroma_db/
+
+# Temp files
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
