@@ -1,6 +1,6 @@
 # 📚 Document Q&A Assistant — Advanced Adaptive RAG Pipeline
 
-> **Live demo:** [customchatgpt1.streamlit.app](https://customchatgpt1.streamlit.app/)
+> **Live demo:** [q-adocuments.streamlit.app](https://q-adocuments.streamlit.app/)
 
 An AI-powered **Retrieval-Augmented Generation (RAG)** system with an **Adaptive Router** that auto-selects the optimal pipeline depth per query — featuring Self-RAG, streaming answers, conversation summarization, semantic chunking, hybrid search, LLM re-ranking, Corrective RAG, hallucination detection, and autonomous agentic reasoning.
 
@@ -139,7 +139,7 @@ streamlit run app.py
 
 ### Streamlit Cloud (production)
 
-The app is deployed at [customchatgpt1.streamlit.app](https://customchatgpt1.streamlit.app/).
+The app is deployed at [q-adocuments.streamlit.app](https://q-adocuments.streamlit.app/).
 API key is configured via Streamlit Secrets (`openai_api_key`).
 
 ---
